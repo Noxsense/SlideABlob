@@ -51,7 +51,7 @@ class Game
 
     // check for every field, if they are in wining.
     std::vector<FieldPattern> *search_patterns();
-    void remove_patterns(std::vector<FieldPattern> pattern);
+    void remove_patterns(std::vector<FieldPattern> *pattern);
 };
 
 /** Create field size.*/
@@ -308,16 +308,44 @@ std::vector<FieldPattern> *Game::search_patterns()
         type -= 1;
       }
 
-      winning_regions->push_back(FieldPattern(i, type, colour));
+      /* Check if this is overlapping with horizontal pattern.*/
+      bool overlaps_with_horizontal_pattern = false;
+      for (int t = 0; t < type; t++)
+      {
+        bool col_l3 = (colour_at(row + t, col - 3) != colour);
+        bool col_l2 = (colour_at(row + t, col - 2) == colour);
+        bool col_l1 = (colour_at(row + t, col - 1) == colour);
+
+        bool overlaps_in_three_left = col_l3 && col_l2 && col_l1;
+
+        bool col_r1 = (colour_at(row + t, col + 1) == colour);
+        bool col_r2 = (colour_at(row + t, col + 2) == colour);
+        bool col_r3 = (colour_at(row + t, col + 3) != colour);
+
+        bool overlaps_in_three_right = col_r1 && col_r2 && col_r3;
+        bool overlaps_in_three_around = col_l1 && col_r1;
+
+        /* If horizontal and vertical are overlapping, chose one. */
+        if (overlaps_in_three_left || overlaps_in_three_right
+            || overlaps_in_three_around)
+        {
+          std::cout << "Overlapping vertical: " << i << "\n";
+          overlaps_with_horizontal_pattern = true;
+          break;
+        }
+      }
+
+      if (!overlaps_with_horizontal_pattern)
+      {
+        winning_regions->push_back(FieldPattern(i, type, colour));
+      }
     }
   }
   /* Unique */
-  /* If horizontal and vertical are overlapping, chose one. */
-  // TODO
   return winning_regions;
 }
 
-void Game::remove_patterns(std::vector<FieldPattern> pattern)
+void Game::remove_patterns(std::vector<FieldPattern> *pattern)
 {
 }
 

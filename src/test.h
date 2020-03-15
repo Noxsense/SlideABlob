@@ -124,11 +124,11 @@ bool test_game(int rows, int cols, int field_variety = 7)
     << "## Create a field with empty cell in first (lower) row."
     << std::endl;
 
-  index = rand() % game.get_rows();  // row[0]
+  index = rand() % game.get_cols();  // row[0]
   custom_fields[index] = 0;
   game.start(custom_fields);
 
-  passed = game.colour_at(index) == 0;
+  passed = game.colour_at(0, index) == 0;
   std::cout << "[" << (summed_tests++) << "] ";
   std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
   passed_tests += passed;

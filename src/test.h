@@ -42,13 +42,14 @@ std::string game_to_string(Game *g)
   return top + str;
 }
 
-bool test_game(int rows, int cols, int field_variety = 7)
+bool test_game(int rows, int cols, int field_variety = 7, bool verbose = true)
 {
 
   if (rows < 3 || cols < 3)
   {
-    std::cout
-      << "Too small for valid playing field, at least 4x4!" << std::endl;
+    if (verbose) std::cout
+      << "Too small ("<<(rows)<<","<<(cols)<<")"
+      << "for valid playing field, at least 4x4!" << std::endl;
     return 1;
   }
 
@@ -62,22 +63,25 @@ bool test_game(int rows, int cols, int field_variety = 7)
 
   // --- Start with size == rows * cols
 
-  std::cout
+  if (verbose) std::cout
     << "Starting game(" << (rows) << "," << (cols) << "). "
-    << "Test if size() == " << (rows*cols) << std::endl;
+      << "Test if size() == " << (rows*cols) << std::endl;
 
   passed = rows*cols == game.get_size();
-  std::cout << "[" << (summed_tests++) << "] ";
-  std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  summed_tests += 1;
   passed_tests += passed;
-  std::cout << game_to_string(&game) << std::endl
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+      << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  if (verbose) std::cout << game_to_string(&game) << std::endl
     << "-------" << std::endl << std::endl;
 
   game.start();
 
   // --- Start randomized, everyone is not empty.
 
-  std::cout << "## Staring game: Every field is not empty." << std::endl;
+  if (verbose) std::cout << "## Staring game: Every field is not empty." << std::endl;
 
   passed = true;
   for (int i = 0; i < game.get_size(); i++)
@@ -87,68 +91,77 @@ bool test_game(int rows, int cols, int field_variety = 7)
     custom_fields.push_back(colour);
   }
 
-  std::cout << "[" << (summed_tests++) << "] ";
-  std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  summed_tests += 1;
   passed_tests += passed;
-  std::cout << game_to_string(&game) << std::endl
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+      << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  if (verbose) std::cout << game_to_string(&game) << std::endl
     << "-------" << std::endl << std::endl;
 
   // --- Fill customized
 
   game.start();  // again randomized.
 
-  std::cout
+  if (verbose) std::cout
     << "## Starting game with custom fields is filling correctly."
-    << std::endl;
+      << std::endl;
 
   game.start(custom_fields);
 
   passed = true;
-  std::cout << "custom: [ ";
+  if (verbose) std::cout << "custom: [ ";
   for (int i = 0; i < game.get_size(); i++)
   {
     passed &= game.colour_at(i) == custom_fields[i];
-    std::cout << custom_fields[i] << " ";
+    if (verbose) std::cout << custom_fields[i] << " ";
   }
-  std::cout << "]" << std::endl;
+  if (verbose) std::cout << "]" << std::endl;
 
-  std::cout << "[" << (summed_tests++) << "] ";
-  std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  summed_tests += 1;
   passed_tests += passed;
-  std::cout << game_to_string(&game) << std::endl
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+      << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  if (verbose) std::cout << game_to_string(&game) << std::endl
     << "-------" << std::endl << std::endl;
 
   // --- Fill with empty cell
 
-  std::cout
+  if (verbose) std::cout
     << "## Create a field with empty cell in first (lower) row."
-    << std::endl;
+      << std::endl;
 
   index = rand() % game.get_cols();  // row[0]
   custom_fields[index] = 0;
   game.start(custom_fields);
 
   passed = game.colour_at(0, index) == 0;
-  std::cout << "[" << (summed_tests++) << "] ";
-  std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  summed_tests += 1;
   passed_tests += passed;
-  std::cout << game_to_string(&game) << std::endl
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+      << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  if (verbose) std::cout << game_to_string(&game) << std::endl
     << "-------" << std::endl << std::endl;
 
   // --- Fix Gravity
-  std::cout << "## Fix Gravity." << std::endl;
+  if (verbose) std::cout << "## Fix Gravity." << std::endl;
 
   passed = game.colour_at(index) == 0;
 
   old.clear();
-  std::cout << " .. will fall down: [ ";
+  if (verbose) std::cout << " .. will fall down: [ ";
   for (int row = 1, tmp = 0; row < rows; row++)
   {
     tmp = game.colour_at(row, index);
     old.push_back(tmp);
-    std::cout << tmp << " ";
+    if (verbose) std::cout << tmp << " ";
   }
-  std::cout << "]" << std::endl;
+  if (verbose) std::cout << "]" << std::endl;
 
   game.fix_gavity();
 
@@ -159,10 +172,13 @@ bool test_game(int rows, int cols, int field_variety = 7)
     passed &= game.colour_at(row, index) == old[row];
   }
 
-  std::cout << "[" << (summed_tests++) << "] ";
-  std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  summed_tests += 1;
   passed_tests += passed;
-  std::cout << game_to_string(&game) << std::endl
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+      << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  if (verbose) std::cout << game_to_string(&game) << std::endl
     << "-------" << std::endl << std::endl;
 
   // --- Slide in LEFT <-
@@ -171,7 +187,7 @@ bool test_game(int rows, int cols, int field_variety = 7)
   {
     colour = rand() % field_variety + 1;
 
-    std::cout << "## Slide (left), row " << index << " ::  "
+    if (verbose) std::cout << "## Slide (left), row " << index << " ::  "
       << "[ " << colour << " | ";
 
     // old row
@@ -180,9 +196,9 @@ bool test_game(int rows, int cols, int field_variety = 7)
     {
       tmp = game.colour_at(index, col);
       old.push_back(tmp);
-      std::cout << tmp << " ";
+      if (verbose) std::cout << tmp << " ";
     }
-    std::cout << "]" << std::endl;
+    if (verbose) std::cout << "]" << std::endl;
 
     game.insert(index, colour);
 
@@ -195,10 +211,13 @@ bool test_game(int rows, int cols, int field_variety = 7)
       passed &= game.colour_at(index, col) == old[col + filled_gap];
     }
 
-    std::cout << "[" << (summed_tests++) << "] ";
-    std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+    summed_tests += 1;
     passed_tests += passed;
-    std::cout << game_to_string(&game) << std::endl
+
+    if (verbose) std::cout
+      << "[" << (summed_tests) << "] "
+        << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+    if (verbose) std::cout << game_to_string(&game) << std::endl
       << "-------" << std::endl << std::endl;
   }
 
@@ -208,8 +227,8 @@ bool test_game(int rows, int cols, int field_variety = 7)
   {
     colour = rand() % field_variety + 1;
 
-    std::cout << "## Slide (right), row " << index << " ::  "
-    << "[ ";
+    if (verbose) std::cout << "## Slide (right), row " << index << " ::  "
+      << "[ ";
 
     // old row
     old.clear();
@@ -217,9 +236,9 @@ bool test_game(int rows, int cols, int field_variety = 7)
     {
       tmp = game.colour_at(index, col);
       old.push_back(tmp);
-      std::cout << tmp << " ";
+      if (verbose) std::cout << tmp << " ";
     }
-    std::cout << "| " << colour << " ]" << std::endl;
+    if (verbose) std::cout << "| " << colour << " ]" << std::endl;
 
     game.insert(2*rows + cols - 1 - index, colour);
 
@@ -232,10 +251,13 @@ bool test_game(int rows, int cols, int field_variety = 7)
       passed &= game.colour_at(index, col) == old[col +1 - filled_gap];
     }
 
-    std::cout << "[" << (summed_tests++) << "] ";
-    std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+    summed_tests += 1;
     passed_tests += passed;
-    std::cout << game_to_string(&game) << std::endl
+
+    if (verbose) std::cout
+      << "[" << (summed_tests) << "] "
+        << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+    if (verbose) std::cout << game_to_string(&game) << std::endl
       << "-------" << std::endl << std::endl;
   }
 
@@ -246,7 +268,7 @@ bool test_game(int rows, int cols, int field_variety = 7)
   {
     colour = rand() % field_variety + 1;
 
-    std::cout << "## Slide (Top), col " << index << " ::  "
+    if (verbose) std::cout << "## Slide (Top), col " << index << " ::  "
       << colour << " \u2192 [ ";
 
     // old row
@@ -255,9 +277,9 @@ bool test_game(int rows, int cols, int field_variety = 7)
     {
       tmp = game.colour_at(rows - 1 - row, index);
       old.push_back(tmp);
-      std::cout << tmp << " ";
+      if (verbose) std::cout << tmp << " ";
     }
-    std::cout << "]" << std::endl;
+    if (verbose) std::cout << "]" << std::endl;
 
     game.insert(index + rows, colour);
 
@@ -271,16 +293,19 @@ bool test_game(int rows, int cols, int field_variety = 7)
         &= game.colour_at(rows-1-row, index) == old[row + filled_gap];
     }
 
-    std::cout << "[" << (summed_tests++) << "] ";
-    std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+    summed_tests += 1;
     passed_tests += passed;
-    std::cout << game_to_string(&game) << std::endl
+
+    if (verbose) std::cout
+      << "[" << (summed_tests) << "] "
+        << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+    if (verbose) std::cout << game_to_string(&game) << std::endl
       << "-------" << std::endl << std::endl;
   }
 
   // --- Winning region.
 
-  std::cout << "## Create winning region"  << std::endl;
+  if (verbose) std::cout << "## Create winning region"  << std::endl;
   // bottom horizontal
   custom_fields.clear();
   for (int f = 0; f < game.get_size(); f++)
@@ -293,75 +318,120 @@ bool test_game(int rows, int cols, int field_variety = 7)
   game.start(custom_fields);
   winning_region = game.search_patterns();
 
+  if (verbose) std::cout << "- Should contain: (pos:0, +3, 3)\n";
+
   passed = false;
 
   for (const FieldPattern &pattern : *winning_region)
   {
-    std::cout << pattern.position << " ";
+    passed |= (pattern.position == 0 && pattern.type >= 3);  // contains 0;
+    if (verbose) std::cout << pattern.position << " ";
   }
-  std::cout << std::endl;
+  if (verbose) std::cout << std::endl;
 
-  std::cout << "[" << (summed_tests++) << "] ";
-  std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  summed_tests += 1;
   passed_tests += passed;
-  std::cout << game_to_string(&game) << std::endl
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+      << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  if (verbose) std::cout << game_to_string(&game) << std::endl
     << "-------" << std::endl << std::endl;
 
   // right vertical (additional)
-  std::cout << "## Insert additional winning region (vertical)"  << std::endl;
-  custom_fields[(cols-1)+0*rows] = (2);
-  custom_fields[(cols-1)+1*rows] = (2);
-  custom_fields[(cols-1)+2*rows] = (2);
+  if (verbose) std::cout << "## Insert additional winning region (vertical)"  << std::endl;
+  custom_fields[(cols-1)+0*cols] = (2);
+  custom_fields[(cols-1)+1*cols] = (2);
+  custom_fields[(cols-1)+2*cols] = (2);
+  custom_fields[(cols-1)+3*cols] = (2); // pattern of four.
+  custom_fields[(cols-2)+0*cols] = (3); // pattern of three, before (horizontal).
   game.start(custom_fields);
   winning_region = game.search_patterns();
+
+  if (verbose) std::cout << "- Should contain: (pos:0, +3, 3)\n";
+  if (verbose) std::cout << "- Should contain: (pos:"<< (cols - 1) << ", -4, 2)\n";
 
   passed = false;
 
   for (const FieldPattern &pattern : *winning_region)
   {
-    std::cout << pattern.position << " ";
+    passed |= (pattern.position == 0 && pattern.type >= 3);  // contains 0;
+    passed |= (pattern.position == cols - 1 && pattern.type <= -4);  // and contains cols -1 ;
+    if (verbose) std::cout << pattern.position << " ";
   }
-  std::cout << std::endl;
+  if (verbose) std::cout << std::endl;
 
-  std::cout << "[" << (summed_tests++) << "] ";
-  std::cout << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  summed_tests += 1;
   passed_tests += passed;
-  std::cout << game_to_string(&game) << std::endl
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+      << (passed ? "Passed" : "Failed") << std::endl << std::endl;
+  if (verbose) std::cout << game_to_string(&game) << std::endl
     << "-------" << std::endl << std::endl;
 
   // should not append: vertical and horizontal (additional)
-  std::cout << "## Insert additional winning region (vertical)"  << std::endl;
-  custom_fields[2+0*rows] = (3);  // already in [0 1 2]
-  custom_fields[2+1*rows] = (3);
-  custom_fields[2+2*rows] = (3);
-  custom_fields[2+3*rows] = (4);  // avoid it is it's own pattern of three
+  if (verbose) std::cout << "## Insert additional winning region (vertical)"  << std::endl;
+  custom_fields[2+0*cols] = (3);  // already in [0 1 2]
+  custom_fields[2+1*cols] = (3);
+  custom_fields[2+2*cols] = (3);
+  custom_fields[2+3*cols] = (4);  // avoid it is it's own pattern of three
+  custom_fields[2+1+0*cols] = (2);  // avoid it is it's own pattern of three
   game.start(custom_fields);
   winning_region = game.search_patterns();
 
+  if (verbose) std::cout << "- Should contain: (pos:0, +3, 3)\n";
+  if (verbose) std::cout << "- Should contain: (pos:"<< (cols - 1) << ", -4, 2)\n";
+  if (verbose) std::cout << "- Should not contain: (pos:"<< (2) << ", -3, 3)\n";
+
   passed = false;
+  bool tmp = true;
 
   for (const FieldPattern &pattern : *winning_region)
   {
-    std::cout << pattern.position << " ";
-  }
-  std::cout << std::endl;
+    passed |= (pattern.position == 0 && pattern.type >= 3);  // contains 0;
+    passed |= (pattern.position == cols - 1 && pattern.type <= -4);  // and contains cols -1 ;
 
-  std::cout << "[" << (summed_tests++) << "] ";
-  std::cout << (passed ? "Passed" : "Failed") << std::endl;
+    tmp &= !(pattern.position == 2 && pattern.type > 2); // contains not 2
+
+    if (verbose) std::cout << pattern.position << " ";
+  }
+  passed &= tmp;
+  if (verbose) std::cout << std::endl;
+
+  summed_tests += 1;
   passed_tests += passed;
-  std::cout << game_to_string(&game) << std::endl
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+      << (passed ? "Passed" : "Failed") << std::endl;
+  if (verbose) std::cout << game_to_string(&game) << std::endl
     << "-------" << std::endl << std::endl;
 
-  //delete winning_region;
+  // --- Deloete Winning regions.
+
+  if (verbose) std::cout
+    << "## Delete Winning region." << std::endl;
+
+  game.remove_patterns(winning_region);
+
+  if (verbose) std::cout
+    << game_to_string(&game) << std::endl
+    << "-------" << std::endl << std::endl;
 
   // ----- Final results.
-  std::cout
-    << std::endl << "======"
-    << std::endl << "[Result]"
-    << std::endl << "Passed/Summed: "
-    << passed_tests << "/" << summed_tests << std::endl;
+  passed = passed_tests == summed_tests;
 
-  return passed_tests == summed_tests;
+  if (verbose) std::cout
+    << std::endl << "======"
+    << std::endl << "[Result] rows: " << rows << ", cols: " << cols
+    << " -- Passed/Summed: "
+    << passed_tests << "/" << summed_tests
+    << " -- " << (passed ? "PASSED" : "FAILED") << "!"
+    << std::endl << "-------"
+    << std::endl << std::endl << std::endl;
+
+  return passed;
 }
 
 #endif // _TESTS_H_

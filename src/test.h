@@ -413,7 +413,40 @@ bool test_game(int rows, int cols, int field_variety = 7, bool verbose = true)
   if (verbose) std::cout
     << "## Delete Winning region." << std::endl;
 
-  game.remove_patterns(winning_region);
+  game.remove_patterns(winning_region, false);
+
+  if (verbose) std::cout
+    << "### At least bot [0,1,2] are now empty" << std::endl;
+
+  passed = !game.colour_at(0,0) && !game.colour_at(0,1) && !game.colour_at(0,2);
+
+  summed_tests += 1;
+  passed_tests += passed;
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+    << (passed ? "Passed" : "Failed") << std::endl;
+
+  if (verbose) std::cout
+    << "### At least bot [col-1,2*col-1,3*col-1,4*col-1] are now empty"
+    << std::endl
+    << "[" << game.colour_at(0,cols-1)
+    << " " << game.colour_at(1,cols-1)
+    << " " << game.colour_at(2,cols-1)
+    << " " << game.colour_at(3,cols-1) << "]" << std::endl;
+
+  passed
+    = !game.colour_at(0,cols-1)
+    && !game.colour_at(1,cols-1)
+    && !game.colour_at(2,cols-1)
+    && !game.colour_at(3,cols-1);
+
+  summed_tests += 1;
+  passed_tests += passed;
+
+  if (verbose) std::cout
+    << "[" << (summed_tests) << "] "
+    << (passed ? "Passed" : "Failed") << std::endl;
 
   if (verbose) std::cout
     << game_to_string(&game) << std::endl

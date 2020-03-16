@@ -17,6 +17,16 @@ class FieldPattern
     FieldPattern(int position, int type, int colour)
       : position(position), type(type), colour(colour)
     {}
+
+    bool is_horizontal()
+    {
+      return type >= 0;
+    }
+
+    int get_size()
+    {
+      return type < 0 ? -type : type;
+    }
 };
 
 class Game
@@ -51,7 +61,7 @@ class Game
 
     // check for every field, if they are in wining.
     std::vector<FieldPattern> *search_patterns();
-    void remove_patterns(std::vector<FieldPattern> *pattern);
+    void remove_patterns(std::vector<FieldPattern> *pattern, bool auto_gravity = true);
 };
 
 /** Create field size.*/
@@ -119,7 +129,8 @@ int Game::set(int index, int colour)
 {
   if (colour < 0)
   {
-    std::cerr << "Game::set(int, int) - Invalid colour." << std::endl;
+    std::cerr << "Game::set("<<(index)<<", "<<(colour)<<") "
+      << "- Invalid colour." << std::endl;
     return colour;
   }
   else if (index >= 0 && index < size)
@@ -130,6 +141,8 @@ int Game::set(int index, int colour)
   }
   else
   {
+    std::cerr << "Game::set("<<(index)<<", "<<(colour)<<") "
+      << "- Invalid arguments." << std::endl;
     return -1;  // invalid index, invalid colour
   }
 }
@@ -173,7 +186,6 @@ void Game::insert(int index, int colour)
 
   if (index < left_end)  // insert left
   {
-    std::cout << " Insert left: " << index << "\n";
     int row = index;
 
     /* Push all (of that row)
@@ -191,7 +203,6 @@ void Game::insert(int index, int colour)
 
   else if (left_end <= index && index < cols_end)  // insert top
   {
-    std::cout << " Insert top: " << index << "\n";
     int col = index - left_end;
 
     /* Push all (of that coloum)
@@ -207,7 +218,6 @@ void Game::insert(int index, int colour)
   }
   else if (cols_end <= index && index < right_end)
   {
-    std::cout << " Insert right: " << index << "\n";
     int row = rows - index + cols_end - 1;
 
     /* Push all (of that row)
@@ -257,7 +267,7 @@ void Game::fix_gavity()
       {
         above ++;
       }
-      this->set(row, col, colour_above);
+      this->set(row, col, colour_above > 0 ? colour_above : 0);
       this->set(above, col, 0);  // empty next.
     }
   }
@@ -282,7 +292,6 @@ std::vector<FieldPattern> *Game::search_patterns()
         && colour_at(row, col+1) == colour && colour && colour_at(row, col+2) == colour
         && colour_at(row, col-1) != colour)  // avoid overlapping
     {
-      std::cout << "Horizontal starting at " << i << std::endl;
       int type = +3;
 
       // increase pattern, if still on same row.
@@ -299,7 +308,6 @@ std::vector<FieldPattern> *Game::search_patterns()
         && colour_at(row+1, col) == colour && colour_at(row+2, col) == colour
         && colour_at(row-1, col) != colour)  // avoid overlapping
     {
-      std::cout << "Vertical around " << i << std::endl;
       int type = -3;
 
       // increase pattern, if still on same row (!= -1)
@@ -310,7 +318,7 @@ std::vector<FieldPattern> *Game::search_patterns()
 
       /* Check if this is overlapping with horizontal pattern.*/
       bool overlaps_with_horizontal_pattern = false;
-      for (int t = 0; t < type; t++)
+      for (int t = 0; t < -type; t++)
       {
         bool col_l3 = (colour_at(row + t, col - 3) != colour);
         bool col_l2 = (colour_at(row + t, col - 2) == colour);
@@ -329,7 +337,6 @@ std::vector<FieldPattern> *Game::search_patterns()
         if (overlaps_in_three_left || overlaps_in_three_right
             || overlaps_in_three_around)
         {
-          std::cout << "Overlapping vertical: " << i << "\n";
           overlaps_with_horizontal_pattern = true;
           break;
         }
@@ -345,8 +352,30 @@ std::vector<FieldPattern> *Game::search_patterns()
   return winning_regions;
 }
 
-void Game::remove_patterns(std::vector<FieldPattern> *pattern)
+void Game::remove_patterns(std::vector<FieldPattern> *pattern, bool auto_gravity)
 {
+  if (pattern == NULL) return;
+
+  for (FieldPattern p : *pattern)
+  {
+    bool horizontal = p.is_horizontal();
+    int form_max = p.get_size();
+    int form_skip = horizontal ? 1 : this->get_cols();
+
+    for (int i = 0; i < form_max; i++)
+    {
+      this->set(p.position + i*form_skip, 0);
+    }
+
+    std::cout << std::endl;
+  }
+
+  if (auto_gravity)
+  {
+    this->fix_gavity();
+  }
+
+  delete pattern;
 }
 
 #endif

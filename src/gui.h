@@ -18,6 +18,23 @@
 
 const bool debug = false;
 
+int score_for(FieldPattern p)
+{
+  int multiplier = p.get_size() - 2;  // x1 x2 x3 ...
+
+  switch (p.colour)
+  {
+    case 1: return 10*multiplier;
+    case 2: return 20*multiplier;
+    case 3: return 30*multiplier;
+    case 4: return 40*multiplier;
+    case 5: return 70*multiplier;
+    case 6: return 100*multiplier;
+    case 7: return 150*multiplier;
+    default: return 0;
+  }
+}
+
 int start_window(int rows, int cols, int time_per_turn = 15)
 {
   SDL_Surface *screen, *tmp, *lama, *bg, *field_colour;
@@ -62,6 +79,9 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   field_colour = SDL_DisplayFormat(tmp);
   SDL_FreeSurface(tmp);
 
+  ck = SDL_MapRGB(screen->format, 0, 0, 0);  // black
+  SDL_SetColorKey(field_colour, SDL_TRUE, ck);
+
   /* Define frame and sprite from texture.*/
   rcColourSrc.w = FIELD_SIZE;
   rcColourSrc.h = FIELD_SIZE;
@@ -83,7 +103,6 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   // ----
 
   bool window_open = true, confirm = false;
-  bool turn_player0 = true;  // indicates, it is player 0's turn
   int index = 0;
   int colour = 1;
   int offset = 4, left_aligned, starting_low, gcolour;
@@ -99,6 +118,13 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   Game game(rows, cols);  // classical 4x4
   game.start();
+
+  int score[2] = {0, 0};
+  int lamas[2] = {5, 5};
+  int tmp_score;
+  bool turn_player0 = true;  // indicates, it is player 0's turn
+
+  std::vector<FieldPattern> *pattern;
 
   long last_update = time(NULL);
 
@@ -178,11 +204,44 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
       /* Check, if something is won and add score and lamas.*/
       if (debug) std::cout << "- check score and lamas." << std::endl;
+      pattern = game.search_patterns();  // new vector<FieldPattern>()
+      while (pattern->size())
+      {
+        for (FieldPattern p : *pattern)
+        {
+          tmp_score = score_for(p);
+
+          score[turn_player0] += tmp_score;
+          lamas[(int) turn_player0] += 1;
+          lamas[(int) !turn_player0] -= 1;
+        }
+        game.remove_patterns(pattern);  // delete vector<FieldPattern>()
+        pattern = game.search_patterns();  // new vector<FieldPattern>()
+      }
 
       /* End move.*/
       gcolour = rand() % FIELD_FRAMES + 1;  // new game colour.
       turn_player0 = !turn_player0;  // toggle player
       confirm = false;  // TODO later.
+
+      std::cout
+        << "Next/Now: Player " << (turn_player0 ? "0" : "1")
+        << std::endl
+        << " ... "
+        << (score[0]) << " (" << lamas[0] << ")"
+        << " | "
+        << (score[1]) << " (" << lamas[1] << ")"
+        << std::endl
+        ;
+
+      if (!lamas[0])
+      {
+        std::cout << "Player 0 lost." << std::endl;
+      }
+      else if (!lamas[1])
+      {
+        std::cout << "Player 1 lost." << std::endl;
+      }
     }
 
     rcColourPos.x = left_aligned;
@@ -222,6 +281,8 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   SDL_FreeSurface(lama);
   SDL_FreeSurface(bg);
   SDL_FreeSurface(field_colour);
+
+  if (pattern) delete pattern;
 
   SDL_Quit();
 

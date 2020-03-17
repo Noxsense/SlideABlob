@@ -329,7 +329,6 @@ std::vector<FieldPattern> *Game::search_patterns()
         type -= 1;
       }
 
-      std::cout << "vertical, at " << i << ", size: " << -type << std::endl;
       winning_regions->push_back(FieldPattern(i, type, colour));
     }
   }
@@ -354,8 +353,6 @@ void Game::remove_patterns(std::vector<FieldPattern> *pattern, bool auto_gravity
     {
       this->set(p.position + i*form_skip, 0);
     }
-
-    std::cout << std::endl;
   }
 
   if (auto_gravity)

@@ -276,6 +276,7 @@ void Game::fix_gavity()
 std::vector<FieldPattern> *Game::search_patterns()
 {
   std::vector<FieldPattern> *winning_regions = new std::vector<FieldPattern>();
+  std::vector<int> backup(this->field);  // if pattern later removed
 
   int cols = this->get_cols();
   int col, row, colour;
@@ -294,9 +295,15 @@ std::vector<FieldPattern> *Game::search_patterns()
     {
       int type = +3;
 
+      // act, like it's deleted later
+      this->set(row,col + 0, 0);
+      this->set(row,col + 1, 0);
+      this->set(row,col + 2, 0);
+
       // increase pattern, if still on same row.
       while (colour_at(row, col+type) == colour)
       {
+        this->set(row,col + type, 0);
         type += 1;
       }
 
@@ -310,44 +317,25 @@ std::vector<FieldPattern> *Game::search_patterns()
     {
       int type = -3;
 
+      // act, like it's deleted later
+      this->set(row + 0,col, 0);
+      this->set(row + 1,col, 0);
+      this->set(row + 2,col, 0);
+
       // increase pattern, if still on same row (!= -1)
-      while (colour_at(col,col - type) == colour)
+      while (colour_at(row - type,col) == colour)
       {
+        this->set(row - type,col, 0);
         type -= 1;
       }
 
-      /* Check if this is overlapping with horizontal pattern.*/
-      bool overlaps_with_horizontal_pattern = false;
-      for (int t = 0; t < -type; t++)
-      {
-        bool col_l3 = (colour_at(row + t, col - 3) != colour);
-        bool col_l2 = (colour_at(row + t, col - 2) == colour);
-        bool col_l1 = (colour_at(row + t, col - 1) == colour);
-
-        bool overlaps_in_three_left = col_l3 && col_l2 && col_l1;
-
-        bool col_r1 = (colour_at(row + t, col + 1) == colour);
-        bool col_r2 = (colour_at(row + t, col + 2) == colour);
-        bool col_r3 = (colour_at(row + t, col + 3) != colour);
-
-        bool overlaps_in_three_right = col_r1 && col_r2 && col_r3;
-        bool overlaps_in_three_around = col_l1 && col_r1;
-
-        /* If horizontal and vertical are overlapping, chose one. */
-        if (overlaps_in_three_left || overlaps_in_three_right
-            || overlaps_in_three_around)
-        {
-          overlaps_with_horizontal_pattern = true;
-          break;
-        }
-      }
-
-      if (!overlaps_with_horizontal_pattern)
-      {
-        winning_regions->push_back(FieldPattern(i, type, colour));
-      }
+      std::cout << "vertical, at " << i << ", size: " << -type << std::endl;
+      winning_regions->push_back(FieldPattern(i, type, colour));
     }
   }
+
+  this->field = backup;  // restore backup.
+
   /* Unique */
   return winning_regions;
 }

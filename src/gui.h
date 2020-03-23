@@ -6,11 +6,13 @@
 #include "SDL.h"
 
 #include "game.h"
+#include "lama.h"
+#include "lama_handler.h"
 
-#define SCREEN_WIDTH 480
+#define SCREEN_WIDTH 350
 #define SCREEN_HEIGHT 512
 
-#define LAMA_SIZE 96
+#define LAMA_SIZE 32
 #define LAMA_FRAMES 4
 
 #define FIELD_SIZE 32
@@ -18,7 +20,7 @@
 
 const bool DEBUG = false;
 
-int score_for(FieldPattern p)
+int pattern_score(FieldPattern p)
 {
   int multiplier = p.get_size() - 2;  // x1 x2 x3 ...
 
@@ -122,7 +124,7 @@ void display_points(int p, SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen
     return display_points(0, surf, src, screen, pos);
   }
 
-  if (src == NULL || pos == NULL || surf == NULL)
+  if (src == NULL || pos == NULL || surf == NULL || screen == NULL)
     return;
 
   // H = 32,  W=19;
@@ -139,6 +141,24 @@ void display_points(int p, SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen
 
     if (!p) break;  // display P:0 at least once.
   }
+}
+
+void display_lama_idle(
+    int xpos, int frame_max,
+    SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen, SDL_Rect *pos)
+{
+  if (src == NULL || pos == NULL || surf == NULL || screen == NULL)
+    return;
+
+  int frame0 = src->x / src->w;
+  int frame1 = (frame0 + 1 + rand() % frame_max) % frame_max;
+
+  if (frame1 < 0) frame1 = 0;
+
+  src->x = frame1 * src->w;
+  pos->x = xpos;
+
+  SDL_BlitSurface(surf, src, screen, pos);
 }
 
 int start_window(int rows, int cols, int time_per_turn = 15)
@@ -161,7 +181,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   /** Load Lama.
    * pink as colour key. */
-  lama = load_picture("res/llama_eat_0.bmp", screen, 0xff, 0x0, 0xff, 0xff);
+  lama = load_picture("res/llama.bmp", screen, 0xff, 0x0, 0xff, 0xff);
   if (lama == NULL)
   {
     std::cerr << "Loading Lamas failed. Exit (1)" << std::endl;
@@ -239,8 +259,11 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   Game game(rows, cols);  // classical 4x4
   game.start();
 
-  int lamas[2] = {5, 5}, score[2] = {0, 0}, tmp_score = 0;
+  int score[2] = {0, 0}, tmp_score = 0, tmp_lama = 0;
   bool turn_player0 = true;  // indicates, it is player 0's turn
+
+  LamaGuiHandler lama_handler(SCREEN_WIDTH / 2, 10);
+  lama_handler.set_texture(lama, LAMA_SIZE, -1, 4, 1);
 
   bool confirm = false, is_removing_pattern = false;
   std::vector<FieldPattern> *pattern;
@@ -347,6 +370,8 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     if (confirm)
     {
       game.insert(index, gcolour[0]);
+      tmp_lama = 0;
+      tmp_score = 0;
 
       /* Check, if something is won and add score and lamas.*/
       if (DEBUG) std::cout << "- check score and lamas." << std::endl;
@@ -355,7 +380,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
       {
         for (FieldPattern p : *pattern)
         {
-          tmp_score = score_for(p);
+          tmp_score = pattern_score(p);
 
           score[turn_player0] += tmp_score;
 
@@ -364,8 +389,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
           // TODO pattern highlight
 
           // if the other still has a lama, get that lama.
-          lamas[(int) turn_player0] += lamas[(int) !turn_player0] ? 1 : 0;
-          lamas[(int) !turn_player0] -=lamas[(int) !turn_player0] ? 1 : 0;
+          tmp_lama += lama_handler.new_lama_for_player(turn_player0);
         }
         game.remove_patterns(pattern, true);  // delete vector<FieldPattern>()
         pattern = game.search_patterns();  // new vector<FieldPattern>()
@@ -382,24 +406,17 @@ int start_window(int rows, int cols, int time_per_turn = 15)
       /*Display new points.*/
       // TODO
 
-      if (DEBUG) std::cout
-        << "Next/Now: Player " << (turn_player0 ? "0" : "1")
-        << std::endl
-        << " ... "
-        << (score[0]) << " (" << lamas[0] << ")"
-        << " | "
-        << (score[1]) << " (" << lamas[1] << ")"
-        << std::endl
-        ;
+      // if (DEBUG)
+        std::cout
+        << " ... " << (score[0]) << " " << " | " << (score[1])
+        << " ... " << (lama_handler.count_lamas(0)) << " " << " | " << (lama_handler.count_lamas(1))
+        << std::endl << std::endl;
 
       /* Define end of current game.*/
-      if (!lamas[0])
+      if (tmp_lama == 10)
       {
-        std::cout << "Player 0 lost." << std::endl;
-      }
-      else if (!lamas[1])
-      {
-        std::cout << "Player 1 lost." << std::endl;
+        std::cout
+          << "Player " << (turn_player0 ? 0 : 1) << " won." << std::endl;
       }
     }
 
@@ -415,16 +432,12 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     display_points(score[1], numbers, &rcNumSrc, screen, &rcNumPos);
 
     // Draw lively lamas.
-    if (time(NULL) - last_update > 0)
-    {
-      rcLamaSrc.x = (rcLamaSrc.x + rcLamaSrc.w) % (LAMA_SIZE * LAMA_FRAMES);
-      last_update = time(NULL);
-    }
-    SDL_BlitSurface(lama, &rcLamaSrc, screen, &rcLamaPos);
+    lama_handler.update_all_lamas();
+    lama_handler.draw_all_lamas(screen, SCREEN_HEIGHT - LAMA_SIZE*3/2);
 
     SDL_BlitSurface(bg, NULL, screen, &rcBGPos);
 
-    SDL_UpdateRect(screen, 0, 0, 0, 0); // update screen.
+    SDL_UpdateRect(screen, 0, 0, 0, 0);  // update screen.
   }
 
   std::cout << "Free bg." << std::endl;

@@ -38,10 +38,8 @@ int score_for(FieldPattern p)
 SDL_Surface *load_picture(
     std::string path,
     SDL_Surface *screen_for_transparency = NULL,
-    int r = 0,
-    int g = 0xff,
-    int b = 0,
-    int a = 0)
+    int r = 0, int g = 0xff, int b = 0,  // green
+    int a = 0xff)
 {
   SDL_Surface *tmp, *surface;
 
@@ -117,10 +115,39 @@ void set_index(
   }
 }
 
+void display_points(int p, SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen, SDL_Rect *pos)
+{
+  if (p < 0)
+  {
+    return display_points(0, surf, src, screen, pos);
+  }
+
+  if (src == NULL || pos == NULL || surf == NULL)
+    return;
+
+  // H = 32,  W=19;
+
+  int div =  p, mod = 0;
+
+  for (div = p; div > 0 || p == 0; div /= 10)
+  {
+    mod = div % 10;
+    src->x = mod * src->w;
+    pos->x -= src->w;
+
+    SDL_BlitSurface(surf, src, screen, pos);
+
+    if (!p) break;  // display P:0 at least once.
+  }
+}
+
 int start_window(int rows, int cols, int time_per_turn = 15)
 {
-  SDL_Surface *screen, *lama, *bg, *field_colours;
-  SDL_Rect rcLamaPos, rcLamaSrc, rcColourPos, rcColourSrc, rcBGPos;
+  SDL_Surface *screen, *lama, *numbers, *bg, *field_colours;
+  SDL_Rect rcLamaPos, rcLamaSrc,
+           rcColourPos, rcColourSrc,
+           rcBGPos,
+           rcNumPos, rcNumSrc;
 
   SDL_Init(SDL_INIT_VIDEO);
   SDL_WM_SetCaption("Slide a Lama (Clone)", "Slide a Lama by Nox");
@@ -144,11 +171,10 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   /* Define frame and sprite from texture.*/
   set_frame_square(&rcLamaSrc, LAMA_SIZE, 0, 3);
-  std::cout << "set_frame_square(lama): w" << rcLamaSrc.w << ",h"<< rcLamaSrc.h << std::endl;
 
   /** Load Field colour. */
   field_colours = load_picture("res/field_colours.bmp",
-      screen, 0x0, 0x0, 0x0, 0xff);
+      screen, 0xff, 0x0, 0xff, 0xff);
 
   if (field_colours == NULL)
   {
@@ -160,7 +186,14 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   /* Define frame and sprite from texture.*/
   set_frame_square(&rcColourSrc, FIELD_SIZE, 0, 0);
-  std::cout << "set_frame_square(colour): w" << rcColourSrc.w << ",h"<< rcColourSrc.h << std::endl;
+
+  /** Load Numbers (for score). */
+  numbers = load_picture("res/numbers.bmp",
+      screen, 0xff, 0x0, 0xff, 0xff);
+
+  /* Define frame and sprite from texture.*/
+  set_frame_square(&rcNumSrc, FIELD_SIZE, 0, 0);
+  rcNumSrc.w = 19;  // custom width!
 
   /** Load Background.*/
   SDL_Surface *tmp = SDL_LoadBMP("res/bg_tile.bmp");
@@ -180,7 +213,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   // ----
 
-  bool window_open = true, confirm = false;
+  bool window_open = true;
   int index = 0;
   int colour = 1;
   int offset = 4, left_aligned, starting_low;
@@ -192,8 +225,8 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   int outer_indices, ltr, bound_top, bound_left, bound_right, i_;
   outer_indices = 2 * rows + cols;
 
-  int gcolour;
-  gcolour = rand() % FIELD_FRAMES + 1;
+  std::vector<int> gcolour;
+  gcolour.push_back(rand() % FIELD_FRAMES + 1);
 
   left_aligned = (2) * (rcColourSrc.w + offset);
   starting_low = (2 + rows) * (rcColourSrc.h + offset);
@@ -206,11 +239,10 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   Game game(rows, cols);  // classical 4x4
   game.start();
 
-  int score[2] = {0, 0};
-  int lamas[2] = {5, 5};
-  int tmp_score;
+  int lamas[2] = {5, 5}, score[2] = {0, 0}, tmp_score = 0;
   bool turn_player0 = true;  // indicates, it is player 0's turn
 
+  bool confirm = false, is_removing_pattern = false;
   std::vector<FieldPattern> *pattern;
 
   /* Remove possible random starting patterns.*/
@@ -266,67 +298,16 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     }
 
     /* ======= Draw. === */
-
     SDL_FillRect(screen, NULL, 0xffffff); // fill white.
 
-    rcColourPos.x = left_aligned;
-    rcColourPos.y = starting_low;
+    /* ===== Draw background. =============================================== */
+    rcBGPos.x = anchor_x - (rcColourPos.w + offset);
+    rcBGPos.y = anchor_y;
 
-    /* Update: Insert at position. */
-    if (confirm)
-    {
-      game.insert(index, gcolour);
-
-      /* Check, if something is won and add score and lamas.*/
-      if (DEBUG) std::cout << "- check score and lamas." << std::endl;
-      pattern = game.search_patterns();  // new vector<FieldPattern>()
-      while (pattern->size())
-      {
-        for (FieldPattern p : *pattern)
-        {
-          tmp_score = score_for(p);
-
-          score[turn_player0] += tmp_score;
-
-          // if the other still has a lama, get that lama.
-          lamas[(int) turn_player0] += lamas[(int) !turn_player0] ? 1 : 0;
-          lamas[(int) !turn_player0] -=lamas[(int) !turn_player0] ? 1 : 0;
-        }
-        game.remove_patterns(pattern);  // delete vector<FieldPattern>()
-        pattern = game.search_patterns();  // new vector<FieldPattern>()
-      }
-
-      /* End move.*/
-      gcolour = rand() % FIELD_FRAMES + 1;  // new game colour.
-      turn_player0 = !turn_player0;  // toggle player
-      confirm = false;  // TODO later.
-
-      std::cout
-        << "Next/Now: Player " << (turn_player0 ? "0" : "1")
-        << std::endl
-        << " ... "
-        << (score[0]) << " (" << lamas[0] << ")"
-        << " | "
-        << (score[1]) << " (" << lamas[1] << ")"
-        << std::endl
-        ;
-
-      if (!lamas[0])
-      {
-        std::cout << "Player 0 lost." << std::endl;
-      }
-      else if (!lamas[1])
-      {
-        std::cout << "Player 1 lost." << std::endl;
-      }
-    }
-
-    rcColourPos.x = 0;
-    rcColourPos.y = 0;
-
+    /* ===== Draw the field and the insertion indicator.. =================== */
+    // Update chosen index for display.
     set_index(index, rows, cols,
         &ltr, &bound_top, &bound_left, &bound_right, &i_);
-
     for (int r = 0; r > bound_top; r--)
     {
       rcColourPos.y = anchor_y + (rows+r) * (rcColourSrc.h + offset);
@@ -352,40 +333,108 @@ int start_window(int rows, int cols, int time_per_turn = 15)
           if (DEBUG) std::cout
             << "Insert into LTR:" << (ltr&4) << (ltr&2) << (ltr&1)
               << ", i'" << i_
-              << ", colour:" << gcolour
+              << ", colour:" << gcolour[0]
               << std::endl;
 
           // inserting colour
-          rcColourSrc.x = rcColourSrc.w * gcolour;
+          rcColourSrc.x = rcColourSrc.w * gcolour[0];
           SDL_BlitSurface(field_colours, &rcColourSrc, screen, &rcColourPos);
         }
       }
     }
 
+    /* ===== Update: Insert at position. ==================================== */
+    if (confirm)
+    {
+      game.insert(index, gcolour[0]);
+
+      /* Check, if something is won and add score and lamas.*/
+      if (DEBUG) std::cout << "- check score and lamas." << std::endl;
+      pattern = game.search_patterns();  // new vector<FieldPattern>()
+      while (pattern->size())
+      {
+        for (FieldPattern p : *pattern)
+        {
+          tmp_score = score_for(p);
+
+          score[turn_player0] += tmp_score;
+
+          /* Visual/Pretty Show every pattern. */
+          // TODO lamas move
+          // TODO pattern highlight
+
+          // if the other still has a lama, get that lama.
+          lamas[(int) turn_player0] += lamas[(int) !turn_player0] ? 1 : 0;
+          lamas[(int) !turn_player0] -=lamas[(int) !turn_player0] ? 1 : 0;
+        }
+        game.remove_patterns(pattern, true);  // delete vector<FieldPattern>()
+        pattern = game.search_patterns();  // new vector<FieldPattern>()
+
+        // TODO pretty gravity display?
+      }
+
+      /* End move.*/
+      gcolour.push_back(rand() % FIELD_FRAMES + 1);  // new game colour.
+      gcolour.erase(gcolour.begin());
+      turn_player0 = !turn_player0;  // toggle player
+      confirm = false;
+
+      /*Display new points.*/
+      // TODO
+
+      if (DEBUG) std::cout
+        << "Next/Now: Player " << (turn_player0 ? "0" : "1")
+        << std::endl
+        << " ... "
+        << (score[0]) << " (" << lamas[0] << ")"
+        << " | "
+        << (score[1]) << " (" << lamas[1] << ")"
+        << std::endl
+        ;
+
+      /* Define end of current game.*/
+      if (!lamas[0])
+      {
+        std::cout << "Player 0 lost." << std::endl;
+      }
+      else if (!lamas[1])
+      {
+        std::cout << "Player 1 lost." << std::endl;
+      }
+    }
+
+    /* ===== Draw points and lamas. ========================================= */
     rcLamaPos.x = 0;
     rcLamaPos.y = starting_low + rcLamaSrc.h;
 
+    rcNumPos.y = 10;
+    rcNumPos.x = 10 + 5*rcNumSrc.w;  // it will grow to the left.
+    display_points(score[0], numbers, &rcNumSrc, screen, &rcNumPos);
+
+    rcNumPos.x = SCREEN_WIDTH - 10;  // it will grow to the left.
+    display_points(score[1], numbers, &rcNumSrc, screen, &rcNumPos);
+
+    // Draw lively lamas.
     if (time(NULL) - last_update > 0)
     {
       rcLamaSrc.x = (rcLamaSrc.x + rcLamaSrc.w) % (LAMA_SIZE * LAMA_FRAMES);
       last_update = time(NULL);
     }
-
-    rcBGPos.x = anchor_x - (rcColourPos.w + offset);
-    rcBGPos.y = anchor_y;
+    SDL_BlitSurface(lama, &rcLamaSrc, screen, &rcLamaPos);
 
     SDL_BlitSurface(bg, NULL, screen, &rcBGPos);
-    SDL_BlitSurface(lama, &rcLamaSrc, screen, &rcLamaPos);
 
     SDL_UpdateRect(screen, 0, 0, 0, 0); // update screen.
   }
 
+  std::cout << "Free bg." << std::endl;
+  SDL_FreeSurface(bg);
   std::cout << "Free lama." << std::endl;
   SDL_FreeSurface(lama);
   std::cout << "Free colours." << std::endl;
   SDL_FreeSurface(field_colours);
-  std::cout << "Free bg." << std::endl;
-  SDL_FreeSurface(bg);
+  std::cout << "Free numbers." << std::endl;
+  SDL_FreeSurface(numbers);
 
   if (pattern) delete pattern;
 

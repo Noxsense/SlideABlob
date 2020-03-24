@@ -3,22 +3,30 @@
 
 #include<iostream>
 #include<vector>
+#include<sys/time.h>
+
 #include "SDL.h"
 
 #include "game.h"
-#include "lama.h"
-#include "lama_handler.h"
+#include "blob.h"
+#include "blob_handler.h"
 
 #define SCREEN_WIDTH 350
 #define SCREEN_HEIGHT 512
 
-#define LAMA_SIZE 32
-#define LAMA_FRAMES 4
+#define BLOB_SIZE 32
+#define BLOB_FRAMES 2
 
 #define FIELD_SIZE 32
 #define FIELD_FRAMES 7
 
+// ----
+
 const bool DEBUG = false;
+
+const int BLOB_COUNT = 10;
+
+// ----
 
 int pattern_score(FieldPattern p)
 {
@@ -55,7 +63,7 @@ SDL_Surface *load_picture(
 
   if (screen_for_transparency != NULL)
   {
-    std::cout << "SetColourKey" << std::endl;
+    if (DEBUG) std::cout << "SetColourKey" << std::endl;
     int colourKey = SDL_MapRGB(screen_for_transparency->format, r, g, b);
     SDL_SetColorKey(surface, SDL_SRCCOLORKEY | SDL_RLEACCEL, colourKey);
   }
@@ -143,33 +151,22 @@ void display_number(int p, SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen
   }
 }
 
-void display_lama_idle(
-    int xpos, int frame_max,
-    SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen, SDL_Rect *pos)
+long get_current_time_millis()
 {
-  if (src == NULL || pos == NULL || surf == NULL || screen == NULL)
-    return;
-
-  int frame0 = src->x / src->w;
-  int frame1 = (frame0 + 1 + rand() % frame_max) % frame_max;
-
-  if (frame1 < 0) frame1 = 0;
-
-  src->x = frame1 * src->w;
-  pos->x = xpos;
-
-  SDL_BlitSurface(surf, src, screen, pos);
+  struct timeval tp;
+  gettimeofday(&tp, NULL);
+  return tp.tv_sec * 1000 + tp.tv_usec / 1000;
 }
 
 int start_window(int rows, int cols, int time_per_turn = 15)
 {
-  SDL_Surface *screen, *lama, *numbers, *player_indicator, *bg, *field_colours;
+  SDL_Surface *screen, *blob, *numbers, *player_indicator, *bg, *field_colours;
   SDL_Rect rcColourPos, rcColourSrc,
            rcBGPos,
            rcNumPos, rcNumSrc;
 
   SDL_Init(SDL_INIT_VIDEO);
-  SDL_WM_SetCaption("Slide a Lama (Clone)", "Slide a Lama by Nox");
+  SDL_WM_SetCaption("Slide a Lama (Clone)", "Slide a Blob by Nox");
 
   screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_WIDTH, 0, 0);
   SDL_EnableKeyRepeat(70, 70); // set keyboard repeat.
@@ -177,12 +174,12 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   // ----
 
   int ck; // colour key for alph13
-  /** Load Lama.
+  /** Load Blob.
    * pink as colour key. */
-  lama = load_picture("res/llama.bmp", screen, 0xff, 0x0, 0xff, 0xff);
-  if (lama == NULL)
+  blob = load_picture("res/blobs.bmp", screen, 0xff, 0x0, 0xff, 0xff);
+  if (blob == NULL)
   {
-    std::cerr << "Loading Lamas failed. Exit (1)" << std::endl;
+    std::cerr << "Loading Blobs failed. Exit (1)" << std::endl;
     SDL_Quit();
     return 1;
   }
@@ -194,7 +191,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   if (field_colours == NULL)
   {
     std::cerr << "Loading Colours failed. Exit (1)" << std::endl;
-    SDL_FreeSurface(lama);
+    SDL_FreeSurface(blob);
     SDL_Quit();
     return 1;
   }
@@ -222,7 +219,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   if (bg == NULL)
   {
     std::cerr << "Loading Background failed. Exit (1)" << std::endl;
-    SDL_FreeSurface(lama);
+    SDL_FreeSurface(blob);
     SDL_FreeSurface(field_colours);
     SDL_Quit();
     return 1;
@@ -259,11 +256,12 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   game.start();
 
   int number_places = 5;
-  int score[2] = {0, 0}, tmp_score = 0, tmp_lama = 0;
+  int score[2] = {0, 0}, tmp_score = 0, tmp_blob = 0;
   bool player1 = true;  // indicates, it is player 0's turn
 
-  LamaGuiHandler lama_handler(SCREEN_WIDTH / 2, 10);
-  lama_handler.set_texture(lama, LAMA_SIZE, -1, 4, 1);
+  BlobGuiHandler blob_handler(SCREEN_WIDTH/3, SCREEN_WIDTH*2/3, BLOB_COUNT);
+  blob_handler.set_texture(blob, BLOB_SIZE, -1, BLOB_FRAMES, 2);
+  blob_handler.set_velocity(BLOB_SIZE / 3);
 
   bool confirm = false, is_removing_pattern = false;
   std::vector<FieldPattern> *pattern;
@@ -276,7 +274,9 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     pattern = game.search_patterns();
   }
 
-  long last_update = time(NULL);
+  long now, last_update;  // in ms
+  now = get_current_time_millis();  // in ms.
+  last_update = now;
 
   /* Update-Loop: Game and frames, etc.*/
   while (window_open)
@@ -372,11 +372,11 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     if (confirm)
     {
       game.insert(index, gcolour[0]);
-      tmp_lama = 0;
+      tmp_blob = 0;
       tmp_score = 0;
 
-      /* Check, if something is won and add score and lamas.*/
-      if (DEBUG) std::cout << "- check score and lamas." << std::endl;
+      /* Check, if something is won and add score and blobs.*/
+      if (DEBUG) std::cout << "- check score and blobs." << std::endl;
       pattern = game.search_patterns();  // new vector<FieldPattern>()
       while (pattern->size())
       {
@@ -387,11 +387,11 @@ int start_window(int rows, int cols, int time_per_turn = 15)
           score[player1] += tmp_score;
 
           /* Visual/Pretty Show every pattern. */
-          // TODO lamas move
+          // TODO blobs move
           // TODO pattern highlight
 
-          // if the other still has a lama, get that lama.
-          tmp_lama += lama_handler.new_lama_for_player(player1);
+          // if the other still has a blob, get that blob.
+          tmp_blob += blob_handler.new_blob_for_player(player1);
         }
         game.remove_patterns(pattern, true);  // delete vector<FieldPattern>()
         pattern = game.search_patterns();  // new vector<FieldPattern>()
@@ -408,21 +408,21 @@ int start_window(int rows, int cols, int time_per_turn = 15)
       /*Display new points.*/
       // TODO
 
-      // if (DEBUG)
+      if (DEBUG)
         std::cout
         << " ... " << (score[0]) << " " << " | " << (score[1])
-        << " ... " << (lama_handler.count_lamas(0)) << " " << " | " << (lama_handler.count_lamas(1))
+        << " ... " << (blob_handler.count_blobs(0)) << " " << " | " << (blob_handler.count_blobs(1))
         << std::endl << std::endl;
 
       /* Define end of current game.*/
-      if (tmp_lama == 10)
+      if (tmp_blob == blob_handler.max_blobs())
       {
         std::cout
           << "Player " << (player1 ? 0 : 1) << " won." << std::endl;
       }
     }
 
-    /* ===== Draw points and lamas. ========================================= */
+    /* ===== Draw points and blobs. ========================================= */
     // indicate current player, reuse number rectangle (will be overridden later)
     rcNumPos.y = offset;
     rcNumPos.x = !player1
@@ -443,10 +443,16 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     display_number(score[1], numbers, &rcNumSrc, screen, &rcNumPos);
 
 
-    // Draw lively lamas.
-    lama_handler.update_all_lamas();
-    // lama_handler.draw_all_lamas(screen, SCREEN_HEIGHT - LAMA_SIZE*2);
-    lama_handler.draw_all_lamas(screen,
+    // Draw lively blobs.
+    now = get_current_time_millis();
+    if (now - last_update > 500)  // every 0.5 second, not more
+    {
+      blob_handler.update_all_blobs(true /*random*/);
+      last_update = now;
+    }
+
+    // blob_handler.draw_all_blobs(screen, SCREEN_HEIGHT - BLOB_SIZE*2);
+    blob_handler.draw_all_blobs(screen,
         anchor_y + 6*(rcColourSrc.h + offset) + 2*offset);
 
     SDL_UpdateRect(screen, 0, 0, 0, 0);  // update screen.
@@ -454,8 +460,8 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   std::cout << "Free bg." << std::endl;
   SDL_FreeSurface(bg);
-  std::cout << "Free lama." << std::endl;
-  SDL_FreeSurface(lama);
+  std::cout << "Free blob." << std::endl;
+  SDL_FreeSurface(blob);
   std::cout << "Free colours." << std::endl;
   SDL_FreeSurface(field_colours);
   std::cout << "Free numbers." << std::endl;

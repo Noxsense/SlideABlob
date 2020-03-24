@@ -35,8 +35,8 @@ res/field_colours.bmp: res/field_colours.sh
 
 .PHONY: $(BUILD_DIR)
 $(BUILD_DIR):
-	@mkdir -vp $(BUILD_DIR)
-	@cp -uvr res/ $(BUILD_DIR)
+	@mkdir -vp $(BUILD_DIR)/res
+	@cp -uvr res/*.bmp $(BUILD_DIR)/res
 
 # ---
 

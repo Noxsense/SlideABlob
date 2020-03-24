@@ -1,5 +1,5 @@
-#ifndef _LAMA_GUI_HANDLER_H
-#define _LAMA_GUI_HANDLER_H
+#ifndef _LAMA_GUI_HANDLER_H_
+#define _LAMA_GUI_HANDLER_H_
 
 #include <vector>
 #include "SDL.h"
@@ -44,10 +44,12 @@ class LamaGuiHandler
     {
       bool p0;
 
+      int mid = seperator / 2;
+
       for (int i = 0; i < lamas.size(); i++)
       {
         p0 = i % 2;
-        lamas[i].reset(p0, p0 * seperator + (rand() % seperator));
+        lamas[i].reset(p0, seperator*p0 + mid*(p0 ? 2 : -2) + (rand()%mid));
         lamas_frame[i] = 0;
       }
     }  // end of reset_all()
@@ -161,7 +163,8 @@ class LamaGuiHandler
       recLamaSrc.y = set * recLamaSrc.h;
 
       recLamaPos.x = lamas[lama].where();
-      recLamaPos.y = pos_y - recLamaSrc.h;
+      // recLamaPos.y = pos_y - (pos_y < recLamaSrc.h ? 0 : recLamaSrc.h);
+      recLamaPos.y = pos_y;
 
       SDL_BlitSurface(surfLama, &recLamaSrc, screen, &recLamaPos);
     }  // draw_lama(int, SDL_Surface*)
@@ -177,4 +180,4 @@ class LamaGuiHandler
 //-----------------------------------------------------------------------------
 };  // end of class LamaGuiHandler
 
-#endif
+#endif  // _LAMA_GUI_HANDLER_H_

@@ -1,5 +1,5 @@
-#ifndef _GUI_H
-#define _GUI_H
+#ifndef _GUI_H_
+#define _GUI_H_
 
 #include<iostream>
 #include<vector>
@@ -117,11 +117,11 @@ void set_index(
   }
 }
 
-void display_points(int p, SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen, SDL_Rect *pos)
+void display_number(int p, SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen, SDL_Rect *pos)
 {
   if (p < 0)
   {
-    return display_points(0, surf, src, screen, pos);
+    return display_number(0, surf, src, screen, pos);
   }
 
   if (src == NULL || pos == NULL || surf == NULL || screen == NULL)
@@ -163,9 +163,8 @@ void display_lama_idle(
 
 int start_window(int rows, int cols, int time_per_turn = 15)
 {
-  SDL_Surface *screen, *lama, *numbers, *bg, *field_colours;
-  SDL_Rect rcLamaPos, rcLamaSrc,
-           rcColourPos, rcColourSrc,
+  SDL_Surface *screen, *lama, *numbers, *player_indicator, *bg, *field_colours;
+  SDL_Rect rcColourPos, rcColourSrc,
            rcBGPos,
            rcNumPos, rcNumSrc;
 
@@ -177,8 +176,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   // ----
 
-  int ck; // colour key for alpha
-
+  int ck; // colour key for alph13
   /** Load Lama.
    * pink as colour key. */
   lama = load_picture("res/llama.bmp", screen, 0xff, 0x0, 0xff, 0xff);
@@ -188,9 +186,6 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     SDL_Quit();
     return 1;
   }
-
-  /* Define frame and sprite from texture.*/
-  set_frame_square(&rcLamaSrc, LAMA_SIZE, 0, 3);
 
   /** Load Field colour. */
   field_colours = load_picture("res/field_colours.bmp",
@@ -209,11 +204,15 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   /** Load Numbers (for score). */
   numbers = load_picture("res/numbers.bmp",
-      screen, 0xff, 0x0, 0xff, 0xff);
+      screen, 0x33, 0x33, 0x33, 0xff);
 
   /* Define frame and sprite from texture.*/
   set_frame_square(&rcNumSrc, FIELD_SIZE, 0, 0);
   rcNumSrc.w = 19;  // custom width!
+
+  /** Load Numbers (for score). */
+  player_indicator = load_picture("res/indicator.bmp",
+      screen, 0x33, 0x33, 0x33, 0xff);
 
   /** Load Background.*/
   SDL_Surface *tmp = SDL_LoadBMP("res/bg_tile.bmp");
@@ -238,8 +237,8 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   int colour = 1;
   int offset = 4, left_aligned, starting_low;
 
-  int anchor_x = 60;
-  int anchor_y = 60;
+  int anchor_x = (SCREEN_WIDTH - rcColourSrc.w*7) / 2 + rcColourSrc.w;
+  int anchor_y = rcColourSrc.h * 2.5;
 
   // inserting and field outer bounds (for stone insertion)
   int outer_indices, ltr, bound_top, bound_left, bound_right, i_;
@@ -259,8 +258,9 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   Game game(rows, cols);  // classical 4x4
   game.start();
 
+  int number_places = 5;
   int score[2] = {0, 0}, tmp_score = 0, tmp_lama = 0;
-  bool turn_player0 = true;  // indicates, it is player 0's turn
+  bool player1 = true;  // indicates, it is player 0's turn
 
   LamaGuiHandler lama_handler(SCREEN_WIDTH / 2, 10);
   lama_handler.set_texture(lama, LAMA_SIZE, -1, 4, 1);
@@ -327,6 +327,8 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     rcBGPos.x = anchor_x - (rcColourPos.w + offset);
     rcBGPos.y = anchor_y;
 
+    SDL_BlitSurface(bg, NULL, screen, &rcBGPos);
+
     /* ===== Draw the field and the insertion indicator.. =================== */
     // Update chosen index for display.
     set_index(index, rows, cols,
@@ -382,14 +384,14 @@ int start_window(int rows, int cols, int time_per_turn = 15)
         {
           tmp_score = pattern_score(p);
 
-          score[turn_player0] += tmp_score;
+          score[player1] += tmp_score;
 
           /* Visual/Pretty Show every pattern. */
           // TODO lamas move
           // TODO pattern highlight
 
           // if the other still has a lama, get that lama.
-          tmp_lama += lama_handler.new_lama_for_player(turn_player0);
+          tmp_lama += lama_handler.new_lama_for_player(player1);
         }
         game.remove_patterns(pattern, true);  // delete vector<FieldPattern>()
         pattern = game.search_patterns();  // new vector<FieldPattern>()
@@ -400,7 +402,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
       /* End move.*/
       gcolour.push_back(rand() % FIELD_FRAMES + 1);  // new game colour.
       gcolour.erase(gcolour.begin());
-      turn_player0 = !turn_player0;  // toggle player
+      player1 = !player1;  // toggle player
       confirm = false;
 
       /*Display new points.*/
@@ -416,26 +418,36 @@ int start_window(int rows, int cols, int time_per_turn = 15)
       if (tmp_lama == 10)
       {
         std::cout
-          << "Player " << (turn_player0 ? 0 : 1) << " won." << std::endl;
+          << "Player " << (player1 ? 0 : 1) << " won." << std::endl;
       }
     }
 
     /* ===== Draw points and lamas. ========================================= */
-    rcLamaPos.x = 0;
-    rcLamaPos.y = starting_low + rcLamaSrc.h;
+    // indicate current player, reuse number rectangle (will be overridden later)
+    rcNumPos.y = offset;
+    rcNumPos.x = !player1
+      ? offset + number_places*rcNumSrc.w
+      : SCREEN_WIDTH - offset;
+    rcNumSrc.x = 0; rcNumSrc.y = 0;
+    for (int i = 0; i < number_places; i ++)
+    {
+      rcNumPos.x -= rcNumSrc.w;
+      SDL_BlitSurface(player_indicator, &rcNumSrc, screen, &rcNumPos);
+    }
 
-    rcNumPos.y = 10;
-    rcNumPos.x = 10 + 5*rcNumSrc.w;  // it will grow to the left.
-    display_points(score[0], numbers, &rcNumSrc, screen, &rcNumPos);
+    rcNumPos.y = offset;
+    rcNumPos.x = offset + number_places*rcNumSrc.w;  // it will grow to the left.
+    display_number(score[0], numbers, &rcNumSrc, screen, &rcNumPos);
 
-    rcNumPos.x = SCREEN_WIDTH - 10;  // it will grow to the left.
-    display_points(score[1], numbers, &rcNumSrc, screen, &rcNumPos);
+    rcNumPos.x = SCREEN_WIDTH - offset;  // it will grow to the left.
+    display_number(score[1], numbers, &rcNumSrc, screen, &rcNumPos);
+
 
     // Draw lively lamas.
     lama_handler.update_all_lamas();
-    lama_handler.draw_all_lamas(screen, SCREEN_HEIGHT - LAMA_SIZE*3/2);
-
-    SDL_BlitSurface(bg, NULL, screen, &rcBGPos);
+    // lama_handler.draw_all_lamas(screen, SCREEN_HEIGHT - LAMA_SIZE*2);
+    lama_handler.draw_all_lamas(screen,
+        anchor_y + 6*(rcColourSrc.h + offset) + 2*offset);
 
     SDL_UpdateRect(screen, 0, 0, 0, 0);  // update screen.
   }
@@ -456,4 +468,4 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   return 0;
 }
 
-#endif
+#endif // _GUI_H_

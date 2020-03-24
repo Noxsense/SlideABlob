@@ -28,7 +28,7 @@ class Blob
         this->pos += goal_pos < pos ? -velocity : velocity;
 
         // goal and current relation changed; goal is reached.
-        if (this->goal_pos < this->pos != to_the_left)
+        if ((this->goal_pos < this->pos) != to_the_left)
         {
           this->goal_pos = -1;
         }

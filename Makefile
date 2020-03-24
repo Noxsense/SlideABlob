@@ -1,5 +1,5 @@
 PROJECT = SlideALama-Clone
-GCC = gcc -xc++ -lstdc++ -shared-libgcc
+GCC = gcc -xc++ -lstdc++ -shared-libgcc -Wall
 
 SDL = `sdl-config --cflags --libs`
 

@@ -177,7 +177,7 @@ void Game::insert(int index, int colour)
   if (index < 0) return;  // invalid position
 
   int cols = this->get_cols();
-  int waiting = colour, old = 0 ;
+  int waiting = colour;
 
   // [left] ++ [top] ++ [right]
   int left_end = this->rows;
@@ -249,7 +249,6 @@ void Game::insert(int index, int colour)
 void Game::fix_gavity()
 {
   int above = 0, colour_above = 0;
-  bool falls;
 
   // for all cols
   for (int col = 0; col < this->get_cols(); col++)

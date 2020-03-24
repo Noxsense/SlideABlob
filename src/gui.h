@@ -12,7 +12,7 @@
 #include "blob_handler.h"
 
 #define SCREEN_WIDTH 350
-#define SCREEN_HEIGHT 512
+#define SCREEN_HEIGHT 640
 
 #define BLOB_SIZE 32
 #define BLOB_FRAMES 2
@@ -25,6 +25,7 @@
 const bool DEBUG = false;
 
 const int BLOB_COUNT = 10;
+const int COLOUR_WAITING_LIST = 3;
 
 // ----
 
@@ -173,7 +174,6 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   // ----
 
-  int ck; // colour key for alph13
   /** Load Blob.
    * pink as colour key. */
   blob = load_picture("res/blobs.bmp", screen, 0xff, 0x0, 0xff, 0xff);
@@ -231,24 +231,22 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   bool window_open = true;
   int index = 0;
-  int colour = 1;
-  int offset = 4, left_aligned, starting_low;
+  int offset = 4;
 
-  int anchor_x = (SCREEN_WIDTH - rcColourSrc.w*7) / 2 + rcColourSrc.w;
-  int anchor_y = rcColourSrc.h * 2.5;
+  int anchor_x
+    = (SCREEN_WIDTH - (rcColourSrc.w+offset)*(cols+2)) / 2
+    + rcColourSrc.w;
+  int anchor_y = rcColourSrc.h * 3.5;
 
   // inserting and field outer bounds (for stone insertion)
   int outer_indices, ltr, bound_top, bound_left, bound_right, i_;
   outer_indices = 2 * rows + cols;
 
   std::vector<int> gcolour;
-  gcolour.push_back(rand() % FIELD_FRAMES + 1);
-
-  left_aligned = (2) * (rcColourSrc.w + offset);
-  starting_low = (2 + rows) * (rcColourSrc.h + offset);
-
-  left_aligned = 60;;
-  starting_low = 170;
+  for (int i = 0; i < COLOUR_WAITING_LIST; i++)
+  {
+    gcolour.push_back(rand() % FIELD_FRAMES + 1);
+  }
 
   SDL_Event event;
 
@@ -281,7 +279,6 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   /* Update-Loop: Game and frames, etc.*/
   while (window_open)
   {
-    bool update = false;
     if (SDL_PollEvent(&event))
     {
       switch (event.type)
@@ -306,17 +303,20 @@ int start_window(int rows, int cols, int time_per_turn = 15)
               if (!confirm && index < outer_indices - 1)
                 index += 1;
               if (DEBUG) std::cout << "Increase, now " << index << std::endl;
-              update = true;
+              // update = true;
               break;
 
             case SDLK_LEFT:
               if (!confirm && 0 < index)
                 index -= 1;
               if (DEBUG) std::cout << "Decrease, now " << index << std::endl;
-              update = true;
+              // update = true;
               break;
+            default: break;
           }
           break;
+
+        default: break;
       }
     }
 
@@ -349,9 +349,9 @@ int start_window(int rows, int cols, int time_per_turn = 15)
           SDL_BlitSurface(field_colours, &rcColourSrc, screen, &rcColourPos);
         }
         // Indicate chosen position (index) for insertion.
-        else if (!confirm &&
-            ((ltr & 0b101) && -r == i_)  // left or right, and chosen row
-            || (ltr == 2 && c == i_)  // top, and chosen column
+        else if ((!confirm) &&
+            (((ltr & 0b101) && -r == i_)  // left or right, and chosen row
+            || (ltr == 2 && c == i_))  // top, and chosen column
             )
         {
 
@@ -405,15 +405,6 @@ int start_window(int rows, int cols, int time_per_turn = 15)
       player1 = !player1;  // toggle player
       confirm = false;
 
-      /*Display new points.*/
-      // TODO
-
-      if (DEBUG)
-        std::cout
-        << " ... " << (score[0]) << " " << " | " << (score[1])
-        << " ... " << (blob_handler.count_blobs(0)) << " " << " | " << (blob_handler.count_blobs(1))
-        << std::endl << std::endl;
-
       /* Define end of current game.*/
       if (tmp_blob == blob_handler.max_blobs())
       {
@@ -442,6 +433,17 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     rcNumPos.x = SCREEN_WIDTH - offset;  // it will grow to the left.
     display_number(score[1], numbers, &rcNumSrc, screen, &rcNumPos);
 
+    // show next insertion colour (waiting list)
+    rcColourPos.x = (SCREEN_WIDTH - (rcColourSrc.w+offset)*gcolour.size()) / 2;
+    rcColourPos.y = offset;
+
+    for (long unsigned int i = 0; i < gcolour.size(); i++)
+    {
+      rcColourSrc.x = rcColourSrc.w * gcolour[i];
+      SDL_BlitSurface(field_colours, &rcColourSrc, screen, &rcColourPos);
+
+      rcColourPos.x += (rcColourSrc.w + offset);
+    }
 
     // Draw lively blobs.
     now = get_current_time_millis();
@@ -453,7 +455,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
     // blob_handler.draw_all_blobs(screen, SCREEN_HEIGHT - BLOB_SIZE*2);
     blob_handler.draw_all_blobs(screen,
-        anchor_y + 6*(rcColourSrc.h + offset) + 2*offset);
+        anchor_y + (rows + 3)*(rcColourSrc.h + offset) + 2*offset);
 
     SDL_UpdateRect(screen, 0, 0, 0, 0);  // update screen.
   }

@@ -65,7 +65,7 @@ class BlobGuiHandler
       int n = max_blobs();
       int offset = n/2 * (recBlobSrc.w < 1 ? 32 : recBlobSrc.w);
 
-      for (int i = 0; i < blobs.size(); i++)
+      for (long unsigned int i = 0; i < blobs.size(); i++)
       {
         p0 = i % 2;
         blobs[i].reset(p0, camp[p0] + random(-offset, offset));
@@ -99,10 +99,9 @@ class BlobGuiHandler
     {
       int blob_count = 0;
       int mover = -1;
-      int n = blobs.size();
       int offset = recBlobSrc.w < 1 ? 10 : recBlobSrc.w / 3;
 
-      for (int i = 0; i < blobs.size(); i++)
+      for (long unsigned int i = 0; i < blobs.size(); i++)
       {
         if (blobs[i].from_player0() == p0)  // is already from p0
         {
@@ -153,9 +152,9 @@ class BlobGuiHandler
     }
 
     /* Select next frame and if needed, updated position.*/
-    void update_blob(int blob, bool random = false)
+    void update_blob(long unsigned int blob, bool random = false)
     {
-      if (blob < 0 || blob >= blobs.size())
+      if (blob >= blobs.size())
         return;  // invalid setting.
 
       int set = blobs_frame_set[blob];
@@ -200,22 +199,20 @@ class BlobGuiHandler
     /* Update all blobs: Select frame and maybe update position.*/
     void update_all_blobs(bool random = false)
     {
-      for (int i = 0; i < blobs.size(); i++)
+      for (long unsigned int i = 0; i < blobs.size(); i++)
       {
         update_blob(i, random);
       }
     }  // end update_all_blobs(bool)
 
     /* Draw a blob in it's current moment. */
-    void draw_blob(int blob, SDL_Surface *screen, int pos_y = 0)
+    void draw_blob(long unsigned int blob, SDL_Surface *screen, int pos_y = 0)
     {
-      if (blob < 0 || blob >= blobs.size())
+      if (blob >= blobs.size())
         return;
 
       if (!screen)
         return;
-
-      int frame = blobs_frame[blob] % max_frames_x;
 
       recBlobSrc.x = blobs_frame[blob] * recBlobSrc.w;
       recBlobSrc.y = blobs_frame_set[blob] * recBlobSrc.h;
@@ -230,7 +227,7 @@ class BlobGuiHandler
     /* Draw all blobs in it's current moment.*/
     void draw_all_blobs(SDL_Surface *screen, int pos_y = 0)
     {
-      for (int i = 0; i < blobs.size(); i++)
+      for (long unsigned int i = 0; i < blobs.size(); i++)
       {
         draw_blob(i, screen, pos_y);
       }

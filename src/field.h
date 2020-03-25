@@ -2,6 +2,7 @@
 #define _FIELD_H_
 
 #include <iostream>
+#include <string>
 #include <vector>
 
 // reference: https://www.youtube.com/watch?v=CXQXQgVflCI
@@ -26,6 +27,20 @@ class FieldPattern
     int size()
     {
       return type < 0 ? -type : type;
+    }
+
+    std::string to_string()
+    {
+      std::string str = "";
+
+      for (int i = 0; i < size(); i++)
+      {
+        str += " " + std::to_string(colour);
+      }
+
+      return "[" + std::to_string(position) + " "
+        + (is_horizontal() ? "\u2192" : "\u2191")
+        + str + "]";
     }
 };
 
@@ -52,6 +67,8 @@ class Field
     int get_rows();
     int get_cols();
 
+    int get_bounds_max();  // maximum positions for colour insertion.
+
     void start(int field_variety = 7);  // number of different colours
     void start(std::vector<int> starting_fields);
 
@@ -63,6 +80,7 @@ class Field
 
     // check for every field, if they are in wining.
     std::vector<FieldPattern> *search_patterns();
+    void remove_pattern(FieldPattern pattern, bool auto_gravity = true);
     void remove_patterns(std::vector<FieldPattern> *pattern, bool auto_gravity = true);
 };
 
@@ -113,9 +131,25 @@ void Field::start(std::vector<int> starting_fields)
   }
 }
 
-int Field::get_size() { return this->size; }
-int Field::get_rows() { return this->rows; }
-int Field::get_cols() { return this->size / this->rows; }
+int Field::get_size()
+{
+  return this->size;
+}
+
+int Field::get_rows()
+{
+  return this->rows;
+}
+
+int Field::get_cols()
+{
+  return this->size / this->rows;
+}
+
+int Field::get_bounds_max()
+{
+  return this->get_rows() * 2 + this->get_cols();
+}
 
 /** Return colour on that position (index).
  * 0 if that field is empty.
@@ -346,20 +380,30 @@ std::vector<FieldPattern> *Field::search_patterns()
   return winning_regions;
 }
 
+void Field::remove_pattern(FieldPattern p, bool auto_gravity)
+{
+  bool horizontal = p.is_horizontal();
+  int form_max = p.size();
+  int form_skip = horizontal ? 1 : this->get_cols();
+
+  for (int i = 0; i < form_max; i++)
+  {
+    this->set(p.position + i*form_skip, 0);
+  }
+
+  if (auto_gravity)
+  {
+    this->fix_gavity();
+  }
+}
+
 void Field::remove_patterns(std::vector<FieldPattern> *pattern, bool auto_gravity)
 {
   if (pattern == NULL) return;
 
   for (FieldPattern p : *pattern)
   {
-    bool horizontal = p.is_horizontal();
-    int form_max = p.size();
-    int form_skip = horizontal ? 1 : this->get_cols();
-
-    for (int i = 0; i < form_max; i++)
-    {
-      this->set(p.position + i*form_skip, 0);
-    }
+    this->remove_pattern(p, false);
   }
 
   if (auto_gravity)

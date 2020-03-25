@@ -8,6 +8,7 @@
 #include "SDL.h"
 
 #include "field.h"
+#include "game.h"
 #include "blob.h"
 #include "blob_handler.h"
 
@@ -308,39 +309,22 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     + rcColourSrc.w;
   int anchor_y = rcColourSrc.h * 3.5;
 
-  // inserting and field outer bounds (for stone insertion)
-  int outer_indices;
-  outer_indices = 2 * rows + cols;
-
-  std::vector<int> gcolour;
-  for (int i = 0; i < COLOUR_WAITING_LIST; i++)
-  {
-    gcolour.push_back(rand() % FIELD_FRAMES + 1);
-  }
-
   SDL_Event event;
 
-  Field field(rows, cols);  // classical 4x4
-  field.start();
+  int colours_on_field = 7;
+  int colours_waiting = 3;
+
+  Game game(rows, cols, colours_on_field, BLOB_COUNT, colours_waiting);
+
+  game.start();
 
   int number_places = 5;
-  int score[2] = {0, 0}, tmp_score = 0, tmp_blob = 0;
-  bool player1 = true;  // indicates, it is player 0's turn
 
   BlobGuiHandler blob_handler(SCREEN_WIDTH/3, SCREEN_WIDTH*2/3, BLOB_COUNT);
   blob_handler.set_texture(blob, BLOB_SIZE, -1, BLOB_FRAMES, 2);
   blob_handler.set_velocity(BLOB_SIZE / 3);
 
   bool confirm = false, is_removing_pattern = false;
-  std::vector<FieldPattern> *pattern;
-
-  /* Remove possible random starting patterns.*/
-  pattern = field.search_patterns();
-  while (pattern->size())
-  {
-    field.remove_patterns(pattern);
-    pattern = field.search_patterns();
-  }
 
   long now, last_update;  // in ms
   now = get_current_time_millis();  // in ms.
@@ -366,19 +350,17 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
             case SDLK_SPACE:
               if (DEBUG) std::cout << "Confirm (" << index << ")" << std::endl;
-              confirm = true;
+              if (!confirm) confirm = true;
               break;
 
             case SDLK_RIGHT:
-              if (!confirm && index < outer_indices - 1)
-                index += 1;
+              if (!confirm) game.inc_index();
               if (DEBUG) std::cout << "Increase, now " << index << std::endl;
               // update = true;
               break;
 
             case SDLK_LEFT:
-              if (!confirm && 0 < index)
-                index -= 1;
+              if (!confirm) game.dec_index();
               if (DEBUG) std::cout << "Decrease, now " << index << std::endl;
               // update = true;
               break;
@@ -403,60 +385,57 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     // Update chosen index for display.
     display_field(
         field_colours, &rcColourSrc, screen,  // SDL resources.
-        &field,  // field
-        index, gcolour[0],  // index to insert colour.
+        game.get_field(),  // field
+        game.get_index(), game.get_waiting_colour(),  // index to insert colour.
         anchor_x, anchor_y, offset  // positioning.
         );
 
     /* ===== Update: Insert at position. ==================================== */
-    if (confirm)
+    if (is_removing_pattern)
     {
-      field.insert(index, gcolour[0]);
-      tmp_blob = 0;
-      tmp_score = 0;
-
-      /* Check, if something is won and add score and blobs.*/
-      if (DEBUG) std::cout << "- check score and blobs." << std::endl;
-      pattern = field.search_patterns();  // new vector<FieldPattern>()
-      while (pattern->size())
+      std::cout << "Is removing patterns.. " << std::endl;
+      if (game.has_waiting_patterns())
       {
-        for (FieldPattern p : *pattern)
+        std::cout << "Remove patterns:";
+
+        for (int i : *game.get_first_pattern())
         {
-          tmp_score = pattern_score(p);
-
-          score[player1] += tmp_score;
-
-          /* Visual/Pretty Show every pattern. */
-          // TODO blobs move
-          // TODO pattern highlight
-
-          // if the other still has a blob, get that blob.
-          tmp_blob += blob_handler.new_blob_for_player(player1);
+          std::cout << " " << i;
         }
-        field.remove_patterns(pattern, true);  // delete vector<FieldPattern>()
-        pattern = field.search_patterns();  // new vector<FieldPattern>()
 
-        // TODO pretty gravity display?
+        std::cout << std::endl;
+        game.add_score_to_current_player(game.remove_first_pattern());
       }
-
-      /* End move.*/
-      gcolour.push_back(rand() % FIELD_FRAMES + 1);  // new field colour.
-      gcolour.erase(gcolour.begin());
-      player1 = !player1;  // toggle player
-      confirm = false;
-
-      /* Define end of current field.*/
-      if (tmp_blob == blob_handler.max_blobs())
+      else  // if no combo, then new turn: next player, next colour, etc.
       {
-        std::cout
-          << "Player " << (player1 ? 0 : 1) << " won." << std::endl;
+        /* Check, if new patterns were built. */
+        game.update_pattern_waiting_list();
+
+        /* New turn: next player, next colour, etc. */
+        if (!game.has_waiting_patterns())
+        {
+          confirm = false;
+          is_removing_pattern = false;
+
+          game.next_turn();
+          game.new_colour();
+        }
+        // else continue removing pattern.
       }
+    }
+    else if (confirm)
+    {
+      game.insert_colour();
+      game.update_pattern_waiting_list();
+      is_removing_pattern = true;
+      std::cout << "CONFIRMED." << std::endl;
     }
 
     /* ===== Draw points and blobs. ========================================= */
     // indicate current player, reuse number rectangle (will be overridden later)
     rcNumPos.y = offset;
-    rcNumPos.x = !player1
+
+    rcNumPos.x = !game.get_current_player()
       ? offset + number_places*rcNumSrc.w
       : SCREEN_WIDTH - offset;
     rcNumSrc.x = 0; rcNumSrc.y = 0;
@@ -466,20 +445,23 @@ int start_window(int rows, int cols, int time_per_turn = 15)
       SDL_BlitSurface(player_indicator, &rcNumSrc, screen, &rcNumPos);
     }
 
-    rcNumPos.y = offset;
     rcNumPos.x = offset + number_places*rcNumSrc.w;  // it will grow to the left.
-    display_number(score[0], numbers, &rcNumSrc, screen, &rcNumPos);
+    display_number(game.get_score_of_player(0),
+        numbers, &rcNumSrc, screen, &rcNumPos);
 
     rcNumPos.x = SCREEN_WIDTH - offset;  // it will grow to the left.
-    display_number(score[1], numbers, &rcNumSrc, screen, &rcNumPos);
+    display_number(game.get_score_of_player(1),
+        numbers, &rcNumSrc, screen, &rcNumPos);
 
     // show next insertion colour (waiting list)
-    rcColourPos.x = (SCREEN_WIDTH - (rcColourSrc.w+offset)*gcolour.size()) / 2;
+    rcColourPos.x
+      = (SCREEN_WIDTH - (rcColourSrc.w+offset)*game.count_colours_waiting())
+      / 2;
     rcColourPos.y = offset;
 
-    for (long unsigned int i = 0; i < gcolour.size(); i++)
+    for (long unsigned int i = 0; i < game.count_colours_waiting(); i++)
     {
-      rcColourSrc.x = rcColourSrc.w * gcolour[i];
+      rcColourSrc.x = rcColourSrc.w * game.get_waiting_colour(i);
       SDL_BlitSurface(field_colours, &rcColourSrc, screen, &rcColourPos);
 
       rcColourPos.x += (rcColourSrc.w + offset);
@@ -491,6 +473,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     {
       blob_handler.update_all_blobs(true /*random*/);
       last_update = now;
+      // TODO
     }
 
     // blob_handler.draw_all_blobs(screen, SCREEN_HEIGHT - BLOB_SIZE*2);
@@ -508,8 +491,6 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   SDL_FreeSurface(field_colours);
   std::cout << "Free numbers." << std::endl;
   SDL_FreeSurface(numbers);
-
-  if (pattern) delete pattern;
 
   SDL_Quit();
 

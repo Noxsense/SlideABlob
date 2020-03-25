@@ -11,7 +11,7 @@ bool pass_tests(bool verbose = true)
   {
     for (int c = 4; c < 10; c++)
     {
-      passed_all &= test_game(r, c, 7, verbose);
+      passed_all &= test_field(r, c, 7, verbose);
     }
   }
 

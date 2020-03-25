@@ -7,12 +7,12 @@
 
 #include "SDL.h"
 
-#include "game.h"
+#include "field.h"
 #include "blob.h"
 #include "blob_handler.h"
 
 #define SCREEN_WIDTH 350
-#define SCREEN_HEIGHT 640
+#define SCREEN_HEIGHT 480
 
 #define BLOB_SIZE 32
 #define BLOB_FRAMES 2
@@ -31,7 +31,7 @@ const int COLOUR_WAITING_LIST = 3;
 
 int pattern_score(FieldPattern p)
 {
-  int multiplier = p.get_size() - 2;  // x1 x2 x3 ...
+  int multiplier = p.size() - 2;  // x1 x2 x3 ...
 
   switch (p.colour)
   {
@@ -97,13 +97,13 @@ void set_index(
 
   *ltr = (is_left << 2) + (is_top << 1) + (is_right);
 
-  if (!ltr)
+  /* If index is invalid, set bounds to normal == no wrapping bounds. */
+
+  if (!bound_top || !bound_left || !bound_right)
   {
-    std::cout
-      << "Warning: Invalid index " << index << " "
-      << "for dimensions (r:" << rows << ", c:" << cols << ")"
-      << std::endl;
-    return;
+    std::cerr
+      << "Warning: Cannot set bounds. No destionation given." << std::endl;
+    return; // cannot set bounds.
   }
 
   /* Set bounds for drawing. in
@@ -115,18 +115,20 @@ void set_index(
   *bound_top = is_top ? - rows - 1 : -rows;
   *bound_right = is_right ? cols + 1 : cols;
 
-  if (display_index)
+  if (display_index)  // set display_index, if requested.
   {
     // display_index indicastes ...
     *display_index
       = is_left ? index % rows  // the row (left side)
       : is_top ? index - rows  // the column (on top)
       : is_right ? rows*2 + cols - 1 - index  // the row (right side)
-      : 0;
+      : -1;
   }
 }
 
-void display_number(int p, SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen, SDL_Rect *pos)
+void display_number(
+    int p,
+    SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen, SDL_Rect *pos)
 {
   if (p < 0)
   {
@@ -152,6 +154,74 @@ void display_number(int p, SDL_Surface *surf, SDL_Rect *src, SDL_Surface *screen
   }
 }
 
+/* Draw the given field with the given SDL resources.*/
+void display_field(
+    SDL_Surface *field_colours,
+    SDL_Rect *rcColourSrc,
+    SDL_Surface *screen,
+    Field *field,
+    int index = -1,
+    int insertion_colour = -1,
+    int anchor_x = 0,
+    int anchor_y = 0,
+    int offset = 4)
+{
+  if (!field)
+  {
+    std::cerr << "Cannot draw field: No Field!" << std::endl;
+    return;
+  }
+  if (!field_colours|| !screen || !rcColourSrc)
+  {
+    std::cerr << "Cannot draw field: No drawing resources!" << std::endl;
+    return;
+  }
+
+  int rows = field->get_rows();
+  int cols = field->get_cols();
+
+  int ltr, bound_top, bound_left, bound_right, i_;
+
+  set_index(insertion_colour < 1 ? -1 : index, rows, cols,
+      &ltr, &bound_top, &bound_left, &bound_right, &i_);
+
+  SDL_Rect rcColourPos;
+
+  for (int r = 0; r > bound_top; r--)
+  {
+    rcColourPos.y = anchor_y + (rows+r) * (rcColourSrc->h + offset);
+
+    for (int c = bound_left; c < bound_right; c++)
+    {
+      rcColourPos.x = (c) * (rcColourSrc->w + offset) + anchor_x;
+
+      // draw field, if inside of [0,cols) and [0,rows)
+      if (c >= 0 && c < cols && r <= 0 && r > -rows)
+      {
+        // field colour
+        rcColourSrc->x = rcColourSrc->w * field->colour_at(-r, c);
+        SDL_BlitSurface(field_colours, rcColourSrc, screen, &rcColourPos);
+      }
+      // Indicate chosen position (index) for insertion.
+      else if (((ltr & 0b101) && -r == i_)  // left or right, and chosen row
+          || (ltr == 2 && c == i_))  // top, and chosen column
+      {
+
+        if (DEBUG) std::cout
+          << "Insert into LTR:" << (ltr&4) << (ltr&2) << (ltr&1)
+            << ", i'" << i_
+            << ", colour:" << insertion_colour
+            << std::endl;
+
+        // inserting colour
+        rcColourSrc->x = rcColourSrc->w * insertion_colour;
+        SDL_BlitSurface(field_colours, rcColourSrc, screen, &rcColourPos);
+      }
+    }
+  }
+}
+
+
 long get_current_time_millis()
 {
   struct timeval tp;
@@ -169,7 +239,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   SDL_Init(SDL_INIT_VIDEO);
   SDL_WM_SetCaption("Slide a Lama (Clone)", "Slide a Blob by Nox");
 
-  screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_WIDTH, 0, 0);
+  screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0);
   SDL_EnableKeyRepeat(70, 70); // set keyboard repeat.
 
   // ----
@@ -239,7 +309,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   int anchor_y = rcColourSrc.h * 3.5;
 
   // inserting and field outer bounds (for stone insertion)
-  int outer_indices, ltr, bound_top, bound_left, bound_right, i_;
+  int outer_indices;
   outer_indices = 2 * rows + cols;
 
   std::vector<int> gcolour;
@@ -250,8 +320,8 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
   SDL_Event event;
 
-  Game game(rows, cols);  // classical 4x4
-  game.start();
+  Field field(rows, cols);  // classical 4x4
+  field.start();
 
   int number_places = 5;
   int score[2] = {0, 0}, tmp_score = 0, tmp_blob = 0;
@@ -265,18 +335,18 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   std::vector<FieldPattern> *pattern;
 
   /* Remove possible random starting patterns.*/
-  pattern = game.search_patterns();
+  pattern = field.search_patterns();
   while (pattern->size())
   {
-    game.remove_patterns(pattern);
-    pattern = game.search_patterns();
+    field.remove_patterns(pattern);
+    pattern = field.search_patterns();
   }
 
   long now, last_update;  // in ms
   now = get_current_time_millis();  // in ms.
   last_update = now;
 
-  /* Update-Loop: Game and frames, etc.*/
+  /* Update-Loop: Field and frames, etc.*/
   while (window_open)
   {
     if (SDL_PollEvent(&event))
@@ -331,53 +401,23 @@ int start_window(int rows, int cols, int time_per_turn = 15)
 
     /* ===== Draw the field and the insertion indicator.. =================== */
     // Update chosen index for display.
-    set_index(index, rows, cols,
-        &ltr, &bound_top, &bound_left, &bound_right, &i_);
-    for (int r = 0; r > bound_top; r--)
-    {
-      rcColourPos.y = anchor_y + (rows+r) * (rcColourSrc.h + offset);
-
-      for (int c = bound_left; c < bound_right; c++)
-      {
-        rcColourPos.x = (c) * (rcColourSrc.w + offset) + anchor_x;
-
-        // draw field, if inside of [0,cols) and [0,rows)
-        if (c >= 0 && c < cols && r <= 0 && r > -rows)
-        {
-          // field colour
-          rcColourSrc.x = rcColourSrc.w * game.colour_at(-r, c);
-          SDL_BlitSurface(field_colours, &rcColourSrc, screen, &rcColourPos);
-        }
-        // Indicate chosen position (index) for insertion.
-        else if ((!confirm) &&
-            (((ltr & 0b101) && -r == i_)  // left or right, and chosen row
-            || (ltr == 2 && c == i_))  // top, and chosen column
-            )
-        {
-
-          if (DEBUG) std::cout
-            << "Insert into LTR:" << (ltr&4) << (ltr&2) << (ltr&1)
-              << ", i'" << i_
-              << ", colour:" << gcolour[0]
-              << std::endl;
-
-          // inserting colour
-          rcColourSrc.x = rcColourSrc.w * gcolour[0];
-          SDL_BlitSurface(field_colours, &rcColourSrc, screen, &rcColourPos);
-        }
-      }
-    }
+    display_field(
+        field_colours, &rcColourSrc, screen,  // SDL resources.
+        &field,  // field
+        index, gcolour[0],  // index to insert colour.
+        anchor_x, anchor_y, offset  // positioning.
+        );
 
     /* ===== Update: Insert at position. ==================================== */
     if (confirm)
     {
-      game.insert(index, gcolour[0]);
+      field.insert(index, gcolour[0]);
       tmp_blob = 0;
       tmp_score = 0;
 
       /* Check, if something is won and add score and blobs.*/
       if (DEBUG) std::cout << "- check score and blobs." << std::endl;
-      pattern = game.search_patterns();  // new vector<FieldPattern>()
+      pattern = field.search_patterns();  // new vector<FieldPattern>()
       while (pattern->size())
       {
         for (FieldPattern p : *pattern)
@@ -393,19 +433,19 @@ int start_window(int rows, int cols, int time_per_turn = 15)
           // if the other still has a blob, get that blob.
           tmp_blob += blob_handler.new_blob_for_player(player1);
         }
-        game.remove_patterns(pattern, true);  // delete vector<FieldPattern>()
-        pattern = game.search_patterns();  // new vector<FieldPattern>()
+        field.remove_patterns(pattern, true);  // delete vector<FieldPattern>()
+        pattern = field.search_patterns();  // new vector<FieldPattern>()
 
         // TODO pretty gravity display?
       }
 
       /* End move.*/
-      gcolour.push_back(rand() % FIELD_FRAMES + 1);  // new game colour.
+      gcolour.push_back(rand() % FIELD_FRAMES + 1);  // new field colour.
       gcolour.erase(gcolour.begin());
       player1 = !player1;  // toggle player
       confirm = false;
 
-      /* Define end of current game.*/
+      /* Define end of current field.*/
       if (tmp_blob == blob_handler.max_blobs())
       {
         std::cout

@@ -1,5 +1,5 @@
-#ifndef _GAME_H_
-#define _GAME_H_
+#ifndef _FIELD_H_
+#define _FIELD_H_
 
 #include <iostream>
 #include <vector>
@@ -23,13 +23,13 @@ class FieldPattern
       return type >= 0;
     }
 
-    int get_size()
+    int size()
     {
       return type < 0 ? -type : type;
     }
 };
 
-class Game
+class Field
 {
   private:
     int rows, size;
@@ -42,8 +42,10 @@ class Game
 
   public:
     // number of rows and cols
-    Game(int rows, int cols);
-    ~Game();
+    Field(int rows = 5, int cols = 5);
+    ~Field();
+
+    void resize(int rows, int cols);  // reset the whole field dimensions.
 
     // public
     int get_size();
@@ -65,25 +67,31 @@ class Game
 };
 
 /** Create field size.*/
-Game::Game(int rows, int cols)
+Field::Field(int rows, int cols)
+{
+  this->resize(rows, cols);
+}
+
+/** free field.*/
+Field::~Field()
+{
+  // delete this->field;
+}
+
+void Field::resize(int rows, int cols)
 {
   srand(time(0));
   this->size = rows * cols;
   this->rows = rows;
 
+  this->field.clear();
   for (int i = 0; i < size; i++) this->field.push_back(0);  // fill all empty
-}
-
-/** free field.*/
-Game::~Game()
-{
-  // delete this->field;
 }
 
 /**
  * Start with random setup.
  */
-void Game::start(int field_variety)
+void Field::start(int field_variety)
 {
   /* Randomly filled.*/
   for (int i = 0; i < this->size; i++)
@@ -95,7 +103,7 @@ void Game::start(int field_variety)
 /**
  * Start with customized setup.
  */
-void Game::start(std::vector<int> starting_fields)
+void Field::start(std::vector<int> starting_fields)
 {
   /* Randomly filled.*/
   int i = 0;
@@ -105,14 +113,14 @@ void Game::start(std::vector<int> starting_fields)
   }
 }
 
-int Game::get_size() { return this->size; }
-int Game::get_rows() { return this->rows; }
-int Game::get_cols() { return this->size / this->rows; }
+int Field::get_size() { return this->size; }
+int Field::get_rows() { return this->rows; }
+int Field::get_cols() { return this->size / this->rows; }
 
 /** Return colour on that position (index).
  * 0 if that field is empty.
  */
-int Game::colour_at(int index)
+int Field::colour_at(int index)
 {
   if (index < 0 || index >= size)
   {
@@ -125,11 +133,11 @@ int Game::colour_at(int index)
  * Get old colour of that position (index).
  * If colour is invalid, don't change the colour, return the colour argument.
  */
-int Game::set(int index, int colour)
+int Field::set(int index, int colour)
 {
   if (colour < 0)
   {
-    std::cerr << "Game::set("<<(index)<<", "<<(colour)<<") "
+    std::cerr << "Field::set("<<(index)<<", "<<(colour)<<") "
       << "- Invalid colour." << std::endl;
     return colour;
   }
@@ -141,7 +149,7 @@ int Game::set(int index, int colour)
   }
   else
   {
-    std::cerr << "Game::set("<<(index)<<", "<<(colour)<<") "
+    std::cerr << "Field::set("<<(index)<<", "<<(colour)<<") "
       << "- Invalid arguments." << std::endl;
     return -1;  // invalid index, invalid colour
   }
@@ -150,7 +158,7 @@ int Game::set(int index, int colour)
 /** Return colour on that position (row, col).
  * 0 if that field is empty.
  */
-int Game::colour_at(int row, int col)
+int Field::colour_at(int row, int col)
 {
   if (row < 0 || col < 0 || row >= rows || col >= this->get_cols())
     return -1; // invalid.
@@ -161,7 +169,7 @@ int Game::colour_at(int row, int col)
  * Get old colour of that position (row,col).
  * If colour is invalid, don't change the colour, return the colour argument.
  */
-int Game::set(int row, int col, int colour)
+int Field::set(int row, int col, int colour)
 {
   if (row < 0 || col < 0 || row >= rows || col >= this->get_cols())
     return -1; // invalid.
@@ -171,7 +179,7 @@ int Game::set(int row, int col, int colour)
 /**
  * Pos starts (0) left, row (0) and goes clockwise, puter row.
  */
-void Game::insert(int index, int colour)
+void Field::insert(int index, int colour)
 {
   if (colour < 1) return;  // invalid colour.
   if (index < 0) return;  // invalid position
@@ -246,7 +254,7 @@ void Game::insert(int index, int colour)
   this->fix_gavity();
 }
 
-void Game::fix_gavity()
+void Field::fix_gavity()
 {
   int above = 0, colour_above = 0;
 
@@ -272,7 +280,7 @@ void Game::fix_gavity()
   }
 }
 
-std::vector<FieldPattern> *Game::search_patterns()
+std::vector<FieldPattern> *Field::search_patterns()
 {
   std::vector<FieldPattern> *winning_regions = new std::vector<FieldPattern>();
   std::vector<int> backup(this->field);  // if pattern later removed
@@ -338,14 +346,14 @@ std::vector<FieldPattern> *Game::search_patterns()
   return winning_regions;
 }
 
-void Game::remove_patterns(std::vector<FieldPattern> *pattern, bool auto_gravity)
+void Field::remove_patterns(std::vector<FieldPattern> *pattern, bool auto_gravity)
 {
   if (pattern == NULL) return;
 
   for (FieldPattern p : *pattern)
   {
     bool horizontal = p.is_horizontal();
-    int form_max = p.get_size();
+    int form_max = p.size();
     int form_skip = horizontal ? 1 : this->get_cols();
 
     for (int i = 0; i < form_max; i++)

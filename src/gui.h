@@ -9,14 +9,14 @@
 
 #include "field.h"
 #include "game.h"
-#include "blob.h"
-#include "blob_handler.h"
+#include "gui_blob_handler.h"
 
 #define SCREEN_WIDTH 350
 #define SCREEN_HEIGHT 480
 
 #define BLOB_SIZE 32
 #define BLOB_FRAMES 2
+#define BLOB_FRAME_SETS 6
 
 #define FIELD_SIZE 32
 #define FIELD_FRAMES 7
@@ -314,15 +314,20 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   int colours_on_field = 7;
   int colours_waiting = 3;
 
-  Game game(rows, cols, colours_on_field, BLOB_COUNT, colours_waiting);
-
-  game.start();
-
   int number_places = 5;
 
-  BlobGuiHandler blob_handler(SCREEN_WIDTH/3, SCREEN_WIDTH*2/3, BLOB_COUNT);
-  blob_handler.set_texture(blob, BLOB_SIZE, -1, BLOB_FRAMES, 2);
-  blob_handler.set_velocity(BLOB_SIZE / 3);
+  BlobGuiHandler blobs_h(SCREEN_WIDTH/2, BLOB_SIZE, BLOB_COUNT);
+  blobs_h.set_texture(blob, BLOB_SIZE, -1, BLOB_FRAMES, BLOB_FRAME_SETS);
+  blobs_h.set_velocity(BLOB_SIZE / 3);
+
+  Game game(rows, cols, colours_on_field, blobs_h.max_blobs(), colours_waiting);
+  game.start();
+
+  int score[8] = { 0, 10, 20, 30, 40, 70, 100, 150 };
+  for (int i = 0; i < colours_on_field + 1; i++)
+  {
+    game.set_colour_score(i, score[i]);
+  }
 
   bool confirm = false, is_removing_pattern = false;
 
@@ -393,18 +398,13 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     /* ===== Update: Insert at position. ==================================== */
     if (is_removing_pattern)
     {
-      std::cout << "Is removing patterns.. " << std::endl;
       if (game.has_waiting_patterns())
       {
-        std::cout << "Remove patterns:";
+        /* Show the field stones to remove. */
+        for (int i : *game.get_first_pattern()) i = i;
 
-        for (int i : *game.get_first_pattern())
-        {
-          std::cout << " " << i;
-        }
-
-        std::cout << std::endl;
         game.add_score_to_current_player(game.remove_first_pattern());
+        blobs_h.new_blob_for_player(game.get_current_player());
       }
       else  // if no combo, then new turn: next player, next colour, etc.
       {
@@ -428,7 +428,6 @@ int start_window(int rows, int cols, int time_per_turn = 15)
       game.insert_colour();
       game.update_pattern_waiting_list();
       is_removing_pattern = true;
-      std::cout << "CONFIRMED." << std::endl;
     }
 
     /* ===== Draw points and blobs. ========================================= */
@@ -471,13 +470,13 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     now = get_current_time_millis();
     if (now - last_update > 500)  // every 0.5 second, not more
     {
-      blob_handler.update_all_blobs(true /*random*/);
+      blobs_h.update_all_blobs(true /*random*/);
       last_update = now;
       // TODO
     }
 
-    // blob_handler.draw_all_blobs(screen, SCREEN_HEIGHT - BLOB_SIZE*2);
-    blob_handler.draw_all_blobs(screen,
+    // blobs_h.draw_all_blobs(screen, SCREEN_HEIGHT - BLOB_SIZE*2);
+    blobs_h.draw_all_blobs(screen,
         anchor_y + (rows + 3)*(rcColourSrc.h + offset) + 2*offset);
 
     SDL_UpdateRect(screen, 0, 0, 0, 0);  // update screen.

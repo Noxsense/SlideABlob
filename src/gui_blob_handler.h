@@ -4,13 +4,100 @@
 #include <vector>
 #include "SDL.h"
 
-#include "blob.h"
-
 #define SET_IDLE 0
 #define SET_WALK_RIGHT 1
 #define SET_WALK_LEFT 2
 
 int random(int,int);
+
+class Blob
+{
+  private:
+    bool player1 = false;  // is part of player 0 team
+    int pos = 0;  // is positioned at that x coordinate
+    int goal_pos = -1;  // if goal_pos is not -1, the blob will walk there.
+
+  public:
+
+    /* Create a new blob. */
+    Blob(bool p1 = false, int x = 0)
+      : player1(p1), pos(x), goal_pos(-1)
+    {
+      this->goal_pos = -1;
+    }
+
+    /* Walk towards the goal position. */
+    void walk(int velocity = 1)
+    {
+      if (velocity < 0) return walk(-velocity);  // use positive number
+
+      if (goal_pos >= 0)
+      {
+        bool to_the_left = this->goal_pos < this->pos;
+        this->pos += goal_pos < pos ? -velocity : velocity;
+
+        // goal and current relation changed; goal is reached.
+        if ((this->goal_pos < this->pos) != to_the_left)
+        {
+          this->goal_pos = -1;
+        }
+      }
+    }
+
+    /* Stop walking, set goal to -1.*/
+    void stop()
+    {
+      return set_goal(-1);
+    }
+
+    /* Return, where the blob is currently standing. */
+    int where()
+    {
+      return this->pos;
+    }
+
+    /* Check, if the blob is walking.*/
+    bool is_walking()
+    {
+      return this->goal_pos >= 0 && this->goal_pos != this->pos;
+    }
+
+    /* If it is waling, check if it's walking to the left.*/
+    bool to_the_left()
+    {
+      return is_walking() && this->goal_pos < this->pos;
+    }
+
+    /* If it is waling, check if it's walking to the right.*/
+    bool to_the_right()
+    {
+      return is_walking() && this->goal_pos > this->pos;
+    }
+
+    /* Set the goal, the blob should walk to. If goal is -1, it will stop. */
+    void set_goal(int goal_pos)
+    {
+      this->goal_pos = goal_pos < 0 ? -1 : goal_pos;
+    }
+
+    /* Return 0/false, if player 0 is oner of blob, else 1 / true. */
+    bool get_player()
+    {
+      return this->player1;
+    }
+
+    void set_player(bool p1)
+    {
+      this->player1 = p1;
+    }
+
+    void reset(bool player1 = false, int pos = 0)
+    {
+      this->player1 = player1;
+      this->pos = pos < 0 ? 0 : pos;
+      this->goal_pos = -1;
+    }
+};
 
 class BlobGuiHandler
 {
@@ -20,7 +107,7 @@ class BlobGuiHandler
     std::vector<int> blobs_frame_set;
     std::vector<int> blobs_frame;
 
-    int camp[2];  // position, where the blobs are divided.
+    int mid, bounds;  // position, where the blobs are divided.
     int velocity;  // pixel, the blob moves per step.
 
     int max_frames_y;
@@ -32,27 +119,27 @@ class BlobGuiHandler
   public:
 
     /* Create a new set of blobs, counting n.*/
-    BlobGuiHandler(int camp0, int camp1, int n = 10)
+    BlobGuiHandler(int mid, int bounds = 32, int n = 10)
     {
       blobs.clear();
       blobs_frame.clear();
       blobs_frame_set.clear();
 
       this->velocity = 1;
-      this->camp[0] = camp0;
-      this->camp[1] = camp1;
+      this->mid = mid;
+      this->bounds = bounds;
 
-      bool p0;
+      bool p1;
       int start_position;  // around their corrisponding camp.
-      int offset = n/4 * 32;
 
       for (int i = 0; i < n; i++)
       {
-        p0 = i % 2;
+        p1 = i % 2;
 
-        start_position = camp[p0] + random(-offset, offset);
+        start_position
+          = random(bounds + (p1 ? mid : 0), (p1 ? mid * 2: mid) - bounds);
 
-        blobs.push_back(Blob(p0, start_position));
+        blobs.push_back(Blob(p1, start_position));
         blobs_frame.push_back(0);
         blobs_frame_set.push_back(0);
       }
@@ -61,14 +148,18 @@ class BlobGuiHandler
     /* Reset all blobs.*/
     void reset_all()
     {
-      bool p0;
-      int n = max_blobs();
-      int offset = n/2 * (recBlobSrc.w < 1 ? 32 : recBlobSrc.w);
+      bool p1;
+
+      int start_position;  // around their corrisponding camp.
 
       for (long unsigned int i = 0; i < blobs.size(); i++)
       {
-        p0 = i % 2;
-        blobs[i].reset(p0, camp[p0] + random(-offset, offset));
+        p1 = i % 2;
+
+        start_position
+        = random(bounds + (p1 ? mid : 0), (p1 ? mid * 2: mid) - bounds);
+
+        blobs[i].reset(p1, start_position);
         blobs_frame[i] = 0;
         blobs_frame_set[i] = 0;
       }
@@ -89,45 +180,46 @@ class BlobGuiHandler
       recBlobPos.x = 0;
       recBlobPos.y = 0;
 
+      this->bounds = width;
+
       this->max_frames_x = max_frames_x;
       this->max_frames_y = max_frames_y;
+
+      this->update_all_blobs(true);  // start positiona and colour.
+
     }  // end set_texture(SDL_Surface, int, int, int, int)
 
-
-    /* Set blob for player0; return it's final blob count.*/
-    int new_blob_for_player(bool p0)
+    /* Set blob for player1; return it's final blob count.*/
+    int new_blob_for_player(bool p1)
     {
       int blob_count = 0;
       int mover = -1;
-      int offset = recBlobSrc.w < 1 ? 10 : recBlobSrc.w / 3;
 
       for (long unsigned int i = 0; i < blobs.size(); i++)
       {
-        if (blobs[i].from_player0() == p0)  // is already from p0
+        if (blobs[i].get_player() == p1)  // is already from p1
         {
           blob_count += 1;
           continue;
         }
-        else if (mover < 0)  // not from p0, not yet updated.
+        else if (mover < 0)  // not from p1, not yet updated.
         {
-          mover = i;
+          mover = i;  // update.
         }
       }
 
       if (mover >= 0)
       {
-        int goal
-          = camp[p0] + (p0 ? blob_count - 1 : -blob_count)*offset
-          + random(-offset, offset);
+        int goal = random(bounds + (p1 ? mid : 0), (p1 ? mid * 2: mid) - bounds);
 
-        blobs[mover].set_player0(p0);
+        blobs[mover].set_player(p1);
         blobs[mover].set_goal(goal);
 
         blob_count += 1;
       }
 
       return blob_count;
-    } // int new_blob_for_player(bool player0)
+    } // int new_blob_for_player(bool player1)
 
     /* Get the number of all blobs handled by the handler.*/
     int max_blobs()
@@ -136,12 +228,12 @@ class BlobGuiHandler
     }
 
     /* Count blobs for a player.*/
-    int count_blobs(bool p0)
+    int count_blobs(bool p1)
     {
       int n = 0;
       for (Blob l : blobs)
       {
-        n += (l.from_player0() == p0);
+        n += (l.get_player() == p1);
       }
       return n;
     }  // end cound_blobs(bool)
@@ -185,10 +277,7 @@ class BlobGuiHandler
           = (random ? rand() : (blobs_frame[blob] + 1)) % max_frames_x;
       }
 
-      int mid = (camp[0] + camp[1]) / 2;
-
       /* Colour depends on side of the blob. */
-
       blobs_frame_set[blob]
         = blobs[blob].where() < mid
         ? set % 3

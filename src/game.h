@@ -16,6 +16,8 @@ class Game
 
     // players and scores.
     int score[2] = {0, 0};
+    int blobs[2] = {0, 0};
+    int blobs_size;
     // BlobGuiHandler blob_handler;  // also for non gui
 
     // colour and current turn.
@@ -27,11 +29,9 @@ class Game
     // removing patterns: step by step
     std::vector<FieldPattern> *waiting_patterns;
 
+    std::vector<long unsigned int> colour_scores;
+
   public:
-
-    const int SCORE_TABLE[8]
-      = { 0, 10, 20, 30, 40, 70, 100, 150 };
-
     /* Create a new game.
      * Field dimension:  rows*cols.
      * Colour count: colours.
@@ -45,6 +45,9 @@ class Game
 
     /* Get the game field. ATTENTION: Changes will apply in the game. */
     Field *get_field();
+    // TODO wrap for safety/security?
+
+    void set_colour_score(long unsigned int  colour, int score);
 
     /* Start the game, player 0 starts.. */
     void start();
@@ -113,9 +116,7 @@ Game::Game(int rows, int cols, int colours, int blobs, int waiting_size)
   this->field.resize(rows < 1 ? 1 : rows, cols < 1 ? 1 : cols);
   this->colours = colours < 1 ? 1 : colours;
   this->waiting_size = waiting_size < 1 ? 1 : waiting_size;
-
-  // TODO later set of blobs.
-  // this->blob_handler
+  this->blobs_size = blobs < 2 ? 2 : blobs;
 }
 
 Game::~Game()
@@ -127,12 +128,21 @@ Game::~Game()
   }
 
   // print the last winner.
-  std::cout << "WINNER: Player " << (score[0] < score[1] ? 0 : 1);
+  std::cout << "WINNER: Player " << (get_current_winner()) << std::endl;
 }
 
 Field *Game::get_field()
 {
   return &(this->field);
+}
+
+void Game::set_colour_score(long unsigned int colour, int score)
+{
+  while (this->colour_scores.size() < colour + 1)
+  {
+    this->colour_scores.push_back(0); // fill with at least 0
+  }
+  this->colour_scores[colour] = score < 0 ? 0 : score;
 }
 
 //-----------------------------------------------------------------------------
@@ -153,7 +163,6 @@ void Game::start()
   waiting_patterns = field.search_patterns();
   while (waiting_patterns->size())
   {
-    std::cout << "Deleted starting patterns." << std::endl;
     field.remove_patterns(waiting_patterns);
     waiting_patterns = field.search_patterns();
   }
@@ -168,7 +177,8 @@ void Game::start()
   this->score[1] = 0;
 
   /* Blobs equally divided by two */
-  // TODO
+  this->blobs[0] = blobs_size / 2;
+  this->blobs[1] = blobs_size - blobs[0];
 }
 
 void Game::new_colour()
@@ -197,7 +207,10 @@ bool Game::get_current_player()
 bool Game::get_current_winner()
 {
   /* Check if someone has all blobs. */
-  // TODO
+  if (blobs[0] == 0 || blobs[1] == 0)
+  {
+    return this->blobs[0] < this->blobs[1];  // p1 with more blobs == true / 1
+  }
 
   /* Otherwise check, who has the current highscore. */
   return this->score[0] < this->score[1];  // score1 bigger == return 1/player 1
@@ -270,13 +283,11 @@ int Game::remove_first_pattern()
 
   FieldPattern p = this->waiting_patterns->at(0);
 
-  std::cout << "remove Pattern: " << p.to_string() << std::endl;
-
   /* size 3 => 1x score
    * size 4 => 2x score
    * size 5 => 3x score ... */
   int pattern_score
-    = SCORE_TABLE[p.colour] * (p.size() - 2);
+    = colour_scores[p.colour] * (p.size() - 2);
 
   /* Pop the first.*/
   this->waiting_patterns->erase(this->waiting_patterns->begin());
@@ -321,8 +332,9 @@ void Game::add_score(bool player1, int score)
 
   if (score > 0)  // add also a blob to the winner.
   {
-    // TODO
-    std::cout << "TODO BLOB." << std::endl;
+    // Add, if the other can give. Remove from other, if not null.
+    this->blobs[player1] += this->blobs[!player1] > 0 ? 1 : 0;
+    this->blobs[!player1] -= this->blobs[!player1] > 0 ? 1 : 0;
   }
 }
 
@@ -338,7 +350,7 @@ int Game::get_score_of_player(bool player1)
 
 int Game::get_blobs_of_player(bool player1)
 {
-  return -1; // TODO
+  return this->blobs[player1];
 }
 
 #endif  //  _GAME_H_

@@ -232,20 +232,32 @@ long get_current_time_millis()
 
 int start_window(int rows, int cols, int time_per_turn = 15)
 {
-  SDL_Surface *screen, *blob, *numbers, *player_indicator, *bg, *field_colours;
+  SDL_Surface *screen, *blob_icon, *bg,
+              *blob, *numbers, *player_indicator, *field_colours;
+
   SDL_Rect rcColourPos, rcColourSrc,
            rcBGPos,
            rcNumPos, rcNumSrc;
 
   SDL_Init(SDL_INIT_VIDEO);
-  SDL_WM_SetCaption("Slide a Lama (Clone)", "Slide a Blob by Nox");
+  SDL_WM_SetCaption("Slide a Blob", "Slide a Lama (Clone) by Nox");
 
   screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0);
   SDL_EnableKeyRepeat(70, 70); // set keyboard repeat.
 
+  blob_icon = load_picture("res/blobs_icon.bmp", screen, 0xff, 0x0, 0xff, 0xff);
+  if (blob_icon == NULL)
+  {
+    std::cerr << "Loading Blobs (icons) failed. Exit (1)" << std::endl;
+    SDL_Quit();
+    return 1;
+  }
+
+  SDL_WM_SetIcon(blob_icon, NULL);
+
   // ----
 
-  /** Load Blob.
+  /* Load Blob.
    * pink as colour key. */
   blob = load_picture("res/blobs.bmp", screen, 0xff, 0x0, 0xff, 0xff);
   if (blob == NULL)
@@ -255,7 +267,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     return 1;
   }
 
-  /** Load Field colour. */
+  /* Load Field colour. */
   field_colours = load_picture("res/field_colours.bmp",
       screen, 0xff, 0x0, 0xff, 0xff);
 
@@ -270,7 +282,7 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   /* Define frame and sprite from texture.*/
   set_frame_square(&rcColourSrc, FIELD_SIZE, 0, 0);
 
-  /** Load Numbers (for score). */
+  /* Load Numbers (for score). */
   numbers = load_picture("res/numbers.bmp",
       screen, 0x33, 0x33, 0x33, 0xff);
 
@@ -278,11 +290,11 @@ int start_window(int rows, int cols, int time_per_turn = 15)
   set_frame_square(&rcNumSrc, FIELD_SIZE, 0, 0);
   rcNumSrc.w = 19;  // custom width!
 
-  /** Load Numbers (for score). */
+  /* Load Numbers (for score). */
   player_indicator = load_picture("res/indicator.bmp",
       screen, 0x33, 0x33, 0x33, 0xff);
 
-  /** Load Background.*/
+  /* Load Background.*/
   SDL_Surface *tmp = SDL_LoadBMP("res/bg_tile.bmp");
   bg = SDL_DisplayFormat(tmp);
   SDL_FreeSurface(tmp);
@@ -472,10 +484,8 @@ int start_window(int rows, int cols, int time_per_turn = 15)
     {
       blobs_h.update_all_blobs(true /*random*/);
       last_update = now;
-      // TODO
     }
 
-    // blobs_h.draw_all_blobs(screen, SCREEN_HEIGHT - BLOB_SIZE*2);
     blobs_h.draw_all_blobs(screen,
         anchor_y + (rows + 3)*(rcColourSrc.h + offset) + 2*offset);
 

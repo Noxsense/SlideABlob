@@ -19,16 +19,11 @@ ICON=res/blobs_icon-alpha.bmp
 
 # ---
 
-build: executable $(BUILD_DIR)/$(PROJECT).desktop
+build: $(BUILD_DIR)/$(PROJECT) $(BUILD_DIR)/$(PROJECT).desktop
 
 $(BUILD_DIR)/$(PROJECT): $(SRC) $(MAIN) $(HEADER) $(BUILD_DIR)
 	@echo "SDL build."
 	$(GCC) -o $(BUILD_DIR)/$(PROJECT) $(SDL) $(SRC) $(MAIN)
-
-executable: $(BUILD_DIR)/$(PROJECT)
-	@echo -e "#!${BASH}\n\ncd $(BUILD_DIR) && ./$(PROJECT)" \
-		> $(BUILD_DIR)/SlideABlob
-	@chmod +x $(BUILD_DIR)/SlideABlob
 
 test: $(SRC) $(TEST_MAIN) $(HEADER) $(BUILD_DIR)
 	@echo "Test."

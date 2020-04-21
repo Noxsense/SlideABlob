@@ -1,3 +1,0 @@
-- [ ] coloured fields with different probabilites
-- [ ] online or sharable with another client (play together)
-- [ ] smart phone compatible ?

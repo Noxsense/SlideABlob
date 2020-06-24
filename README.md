@@ -4,6 +4,8 @@
 
 Slide a Blob is a simple clone for the old ICQ game Slide a Lama.
 
+*Still work in progress, currently paused.*
+
 ## Build
 
 ```
